@@ -1,14 +1,12 @@
---// YOGIMINI ULTIMATE BRAINROT AUTO-FARM (Fixed & Smart)
+--// YOGIMINI BRAINROT REPAIR-V2 (No-Button-Edition)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Liste der Namen, nach denen gesucht werden soll
 local targetNames = {"Exclusive", "OG", "Divine", "Eternal", "Celestial", "Admin"}
 
 -- Funktion zum Drücken der E-Taste
@@ -18,64 +16,54 @@ local function pressE()
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
--- Funktion: Finde das nächste Brainrot-Objekt im Workspace
+-- VERBESSERTE SUCHE: Ignoriert Shop-Knöpfe
 local function findTarget(namePart)
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("Model") then
-            if string.find(obj.Name, namePart) then
-                return obj:IsA("Model") and obj.PrimaryPart or obj
+        -- Prüfe, ob der Name passt UND es kein UI-Knopf ist
+        if (obj:IsA("BasePart") or obj:IsA("Model")) and string.find(obj.Name, namePart) then
+            
+            -- CHECK: Ist es ein Kauf-Button? (Ignoriere Objekte mit "Button" oder "Purchase" im Namen/Parent)
+            local isButton = false
+            if string.find(string.lower(obj.Name), "button") or 
+               string.find(string.lower(obj.Name), "buy") or 
+               obj:FindFirstChildWhichIsA("BillboardGui") then
+                isButton = true
+            end
+
+            if not isButton then
+                -- Wenn es ein Model ist, nimm das Hauptteil, sonst das Part selbst
+                return obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
             end
         end
     end
     return nil
 end
 
--- GUI Erstellung
+-- GUI (Gleiches Design wie vorhin)
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "YogiminiFarm"
+gui.Name = "YogiminiFarmV2"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 200, 0, 100)
 frame.Position = UDim2.new(0.5, -100, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(40, 0, 70) -- Schickes Lila/Dunkel
-frame.BorderSizePixel = 0
-
-local corner = Instance.new("UICorner", frame)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Instance.new("UICorner", frame)
 
 local toggle = Instance.new("TextButton", frame)
 toggle.Size = UDim2.new(0, 160, 0, 40)
 toggle.Position = UDim2.new(0.5, -80, 0.5, -20)
 toggle.Text = "START FARM"
-toggle.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+toggle.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 toggle.TextColor3 = Color3.new(1,1,1)
 toggle.TextScaled = true
 Instance.new("UICorner", toggle)
-
--- Dragging Support für Mobile
-local dragging, dragInput, dragStart, startPos
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-end)
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.Touch then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-game:GetService("UserInputService").InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then dragging = false end
-end)
 
 -- FARMING LOGIK
 toggle.MouseButton1Click:Connect(function()
     farming = not farming
     toggle.Text = farming and "STOP FARM" or "START FARM"
-    toggle.BackgroundColor3 = farming and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(0, 200, 100)
+    toggle.BackgroundColor3 = farming and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 150, 255)
 
     if farming then
         task.spawn(function()
@@ -84,7 +72,6 @@ toggle.MouseButton1Click:Connect(function()
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 
                 if hrp then
-                    -- Setze Base Position beim Start, falls noch nicht geschehen
                     if not basePos then basePos = hrp.Position end
 
                     for _, name in ipairs(targetNames) do
@@ -92,21 +79,20 @@ toggle.MouseButton1Click:Connect(function()
                         
                         local target = findTarget(name)
                         if target then
-                            -- 1. Hin-Teleportieren
-                            hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0) -- Teleport etwas über das Objekt
+                            -- Teleportiere direkt zum Objekt
+                            hrp.CFrame = target.CFrame * CFrame.new(0, 2, 0) 
                             task.wait(0.5)
                             
-                            -- 2. E Drücken
                             pressE()
-                            task.wait(0.5)
+                            task.wait(0.3)
                             
-                            -- 3. Zurück nach Hause
+                            -- Sofort zurück nach Hause
                             hrp.CFrame = CFrame.new(basePos)
-                            task.wait(1)
+                            task.wait(0.7) -- Kurze Pause vor dem nächsten Check
                         end
                     end
                 end
-                task.wait(1)
+                task.wait(0.5)
             end
         end)
     end
