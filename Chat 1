@@ -1,55 +1,76 @@
---// YOGIMINI BRAINROT V8 (ENGINE-EXPLOIT EDITION)
+--// YOGIMINI BRAINROT V9 (ANTI-ROBUX-PLATE EDITION)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Priorität (Beste zuerst)
+-- Priorität
 local priority = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
 
--- Funktion: Versucht das Brainrot mit ALLEN Mitteln aufzusammeln
-local function megaInteract(target)
-    -- 1. Versuch: ProximityPrompt (Engine Standard)
+-- Funktion: E-Taste drücken (mit Proximity-Support)
+local function interact(target)
     local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
     if prompt then
         fireproximityprompt(prompt)
-    end
-    
-    -- 2. Versuch: ClickDetector (Alter Engine Standard)
-    local cd = target:FindFirstChildWhichIsA("ClickDetector", true)
-    if cd then
-        fireclickdetector(cd)
-    end
-
-    -- 3. Versuch: "E" Taste physisch hämmern
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.1)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    
-    -- 4. Versuch: RemoteEvents im ReplicatedStorage triggern (Blind-Versuch)
-    -- Viele Spiele nutzen Events namens "Pickup" oder "Collect"
-    for _, child in ipairs(ReplicatedStorage:GetDescendants()) do
-        if child:IsA("RemoteEvent") and (string.find(child.Name, "Collect") or string.find(child.Name, "Pickup")) then
-            child:FireServer(target)
-        end
+    else
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.15)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
     end
 end
 
--- Funktion: Findet das Ziel (Workspace-Klasse optimiert)
-local function getTarget()
-    for _, rarity in ipairs(priority) do
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), rarity) then
-                local model = obj:FindFirstAncestorOfClass("Model")
-                if model and not string.find(string.lower(model.Name), "spawner") then
-                    -- Wir nehmen das RootPart oder das erste Part im Model
-                    local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart", true)
-                    if hrp then return model, hrp end
+-- Der ultimative Button-Filter
+local function isShopButton(obj)
+    -- Suche im Modell nach Kauf-Anzeichen
+    local model = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
+    if model then
+        -- 1. Check: Gibt es ein Robux-Symbol oder "R$" im Text?
+        for _, desc in ipairs(model:GetDescendants()) do
+            if desc:IsA("TextLabel") or desc:IsA("ImageLabel") then
+                local t = string.lower(desc:IsA("TextLabel") and desc.Text or "")
+                if string.find(t, "rbx") or string.find(t, "robux") or string.find(t, "price") then
+                    return true
                 end
+                -- Check für das grüne Robux-Icon (oft ImageLabel)
+                if desc:IsA("ImageLabel") and string.find(string.lower(desc.Image), "rbx") then
+                    return true
+                end
+            end
+        end
+        -- 2. Check: Ist das Teil eine flache Bodenplatte? (Siehe Foto 1000053018.jpg)
+        local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+        if not root then return true end -- Echte NPCs haben fast immer ein RootPart
+    end
+    return false
+end
+
+local function getBestTarget()
+    local foundObjects = {}
+    
+    -- Suche alle TextLabels mit Seltenheiten
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            local txt = string.upper(obj.Text)
+            for _, rarity in ipairs(priority) do
+                if string.find(txt, rarity) then
+                    local model = obj:FindFirstAncestorOfClass("Model")
+                    if model and not isShopButton(model) then
+                        table.insert(foundObjects, {m = model, p = rarity})
+                    end
+                end
+            end
+        end
+    end
+
+    -- Wähle das Beste aus der Liste nach Priorität
+    for _, pName in ipairs(priority) do
+        for _, data in ipairs(foundObjects) do
+            if data.p == pName then
+                local hrp = data.m:FindFirstChild("HumanoidRootPart") or data.m.PrimaryPart
+                if hrp then return data.m, hrp end
             end
         end
     end
@@ -58,48 +79,38 @@ end
 
 -- GUI
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "YogiminiElite"
+gui.Name = "YogiminiV9"
 gui.ResetOnSpawn = false
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 80)
-frame.Position = UDim2.new(0.5, -100, 0.02, 0)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Instance.new("UICorner", frame)
-
-local btn = Instance.new("TextButton", frame)
-btn.Size = UDim2.new(1, -10, 1, -10)
-btn.Position = UDim2.new(0, 5, 0, 5)
-btn.Text = "START ELITE FARM"
-btn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
-btn.TextScaled = true
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0, 200, 0, 50)
+btn.Position = UDim2.new(0.5, -100, 0, 10)
+btn.Text = "START V9 (NO PLATES)"
+btn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "RUNNING..." or "START ELITE FARM"
-    
+    btn.Text = farming and "FARMING..." or "START V9"
+    btn.BackgroundColor3 = farming and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+
     if farming then
         task.spawn(function()
             while farming do
                 local char = player.Character
                 local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-                
                 if myHrp then
                     if not basePos then basePos = myHrp.Position end
-
-                    local targetModel, targetHrp = getTarget()
+                    
+                    local targetModel, targetHrp = getBestTarget()
                     if targetHrp then
-                        -- Teleport: Direkt INS Brainrot hinein (manchmal braucht man Kontakt)
-                        myHrp.CFrame = targetHrp.CFrame
-                        
-                        task.wait(0.3)
-                        megaInteract(targetModel)
+                        -- Teleport DIREKT zum NPC (etwas versetzt damit "E" triggert)
+                        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
+                        task.wait(0.4)
+                        interact(targetModel)
                         task.wait(0.2)
-                        
-                        -- Zurück
                         myHrp.CFrame = CFrame.new(basePos)
-                        task.wait(0.5)
+                        task.wait(0.7)
                     end
                 end
                 task.wait(0.5)
