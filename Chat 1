@@ -1,4 +1,4 @@
---// YOGIMINI BRAINROT V9 (ANTI-ROBUX-PLATE EDITION)
+--// YOGIMINI V10: THE SHOP-BREAKER (FINAL)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -7,70 +7,78 @@ local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Priorität
+-- Priorität der Seltenheiten
 local priority = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
 
--- Funktion: E-Taste drücken (mit Proximity-Support)
+-- Funktion: Hard-Interaktion
 local function interact(target)
     local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
     if prompt then
         fireproximityprompt(prompt)
     else
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.15)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    end
-end
-
--- Der ultimative Button-Filter
-local function isShopButton(obj)
-    -- Suche im Modell nach Kauf-Anzeichen
-    local model = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
-    if model then
-        -- 1. Check: Gibt es ein Robux-Symbol oder "R$" im Text?
-        for _, desc in ipairs(model:GetDescendants()) do
-            if desc:IsA("TextLabel") or desc:IsA("ImageLabel") then
-                local t = string.lower(desc:IsA("TextLabel") and desc.Text or "")
-                if string.find(t, "rbx") or string.find(t, "robux") or string.find(t, "price") then
-                    return true
-                end
-                -- Check für das grüne Robux-Icon (oft ImageLabel)
-                if desc:IsA("ImageLabel") and string.find(string.lower(desc.Image), "rbx") then
-                    return true
-                end
-            end
+        -- Wir drücken E mehrfach, um sicherzugehen
+        for i = 1, 3 do
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end
-        -- 2. Check: Ist das Teil eine flache Bodenplatte? (Siehe Foto 1000053018.jpg)
-        local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-        if not root then return true end -- Echte NPCs haben fast immer ein RootPart
     end
-    return false
 end
 
-local function getBestTarget()
-    local foundObjects = {}
-    
-    -- Suche alle TextLabels mit Seltenheiten
+-- Der ultimative Shop-Platten-Killer
+local function isActuallyABrainrot(obj)
+    local model = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
+    if not model then return false end
+
+    -- 1. DISTANZ-CHECK (Der wichtigste Part!)
+    -- Wenn das Teil zu nah am Startpunkt ist, ist es IMMER ein Shop-Knopf.
+    if basePos then
+        local dist = (model:GetPivot().Position - basePos).Magnitude
+        if dist < 40 then return false end -- Shop-Platten sind meistens nah beieinander am Spawn
+    end
+
+    -- 2. ROBUX-CHECK (Extrem sensibel)
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("ImageLabel") and (string.find(child.Image, "rbx") or string.find(child.Image, "9430635442")) then
+            return false -- Das ist ein Kauf-Icon!
+        end
+        if child:IsA("TextLabel") and (string.find(child.Text, "R%$") or string.find(child.Text, "299") or string.find(child.Text, "599")) then
+            return false -- Das ist ein Preis!
+        end
+    end
+
+    -- 3. FORM-CHECK
+    -- Shop-Platten haben oft keinen "Humanoid". Echte Brainrots oft schon.
+    if not model:FindFirstChildOfClass("Humanoid") and not model:FindFirstChild("HumanoidRootPart") then
+        -- Wenn es nur ein flacher Klotz ist, ignorieren wir es
+        local box = model:FindFirstChildWhichIsA("BasePart")
+        if box and box.Size.Y < 1.5 then return false end
+    end
+
+    return true
+end
+
+local function findTheRealOne()
+    local potentialTargets = {}
+
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
-            local txt = string.upper(obj.Text)
-            for _, rarity in ipairs(priority) do
-                if string.find(txt, rarity) then
-                    local model = obj:FindFirstAncestorOfClass("Model")
-                    if model and not isShopButton(model) then
-                        table.insert(foundObjects, {m = model, p = rarity})
+            local t = string.upper(obj.Text)
+            for _, pName in ipairs(priority) do
+                if string.find(t, pName) then
+                    if isActuallyABrainrot(obj) then
+                        table.insert(potentialTargets, {model = obj:FindFirstAncestorOfClass("Model") or obj.Parent, prio = pName})
                     end
                 end
             end
         end
     end
 
-    -- Wähle das Beste aus der Liste nach Priorität
+    -- Sortiere nach deiner Prioritäts-Liste
     for _, pName in ipairs(priority) do
-        for _, data in ipairs(foundObjects) do
-            if data.p == pName then
-                local hrp = data.m:FindFirstChild("HumanoidRootPart") or data.m.PrimaryPart
-                if hrp then return data.m, hrp end
+        for _, entry in ipairs(potentialTargets) do
+            if entry.prio == pName then
+                return entry.model
             end
         end
     end
@@ -79,41 +87,44 @@ end
 
 -- GUI
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "YogiminiV9"
 gui.ResetOnSpawn = false
-
 local btn = Instance.new("TextButton", gui)
 btn.Size = UDim2.new(0, 200, 0, 50)
-btn.Position = UDim2.new(0.5, -100, 0, 10)
-btn.Text = "START V9 (NO PLATES)"
-btn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+btn.Position = UDim2.new(0.5, -100, 0.05, 0)
+btn.Text = "V10: KILL SHOP BUTTONS"
+btn.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+btn.TextColor3 = Color3.new(1,1,1)
+btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "FARMING..." or "START V9"
-    btn.BackgroundColor3 = farming and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
-
+    btn.Text = farming and "FARMING..." or "START V10"
+    
     if farming then
+        -- Setze BasePos beim ALLERERSTEN Klick (Stell dich weit weg vom Shop auf!)
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            basePos = char.HumanoidRootPart.Position
+        end
+
         task.spawn(function()
             while farming do
-                local char = player.Character
-                local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+                local myChar = player.Character
+                local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                
                 if myHrp then
-                    if not basePos then basePos = myHrp.Position end
-                    
-                    local targetModel, targetHrp = getBestTarget()
-                    if targetHrp then
-                        -- Teleport DIREKT zum NPC (etwas versetzt damit "E" triggert)
-                        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
+                    local target = findTheRealOne()
+                    if target then
+                        local targetPos = target:GetPivot().Position
+                        myHrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
                         task.wait(0.4)
-                        interact(targetModel)
+                        interact(target)
                         task.wait(0.2)
                         myHrp.CFrame = CFrame.new(basePos)
-                        task.wait(0.7)
                     end
                 end
-                task.wait(0.5)
+                task.wait(1)
             end
         end)
     end
