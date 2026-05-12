@@ -1,0 +1,106 @@
+--// Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Brainrot Auto Farm",
+    LoadingTitle = "Brainrot Hub",
+    LoadingSubtitle = "by ChatGPT",
+    ConfigurationSaving = {
+        Enabled = false
+    }
+})
+
+local Tab = Window:CreateTab("Auto Farm", 4483362458)
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+--// DEINE BASE POSITION
+local basePos = Vector3.new(0,10,0)
+
+--// BRAINROT POSITIONEN
+local brainrots = {
+    ["Exclusive"] = Vector3.new(100,10,200),
+    ["OG"] = Vector3.new(150,10,250),
+    ["Divine"] = Vector3.new(200,10,300),
+    ["Celestial"] = Vector3.new(250,10,350),
+    ["Eternal"] = Vector3.new(300,10,400),
+    ["Admin"] = Vector3.new(350,10,450)
+}
+
+local autofarm = false
+
+--// TELEPORT + E
+local function collectBrainrot(pos)
+
+    -- teleport zum brainrot
+    hrp.CFrame = CFrame.new(pos)
+
+    task.wait(1)
+
+    -- E drücken
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+    task.wait(1)
+
+    -- zurück zur base
+    hrp.CFrame = CFrame.new(basePos)
+
+    task.wait(1)
+end
+
+--// TOGGLE
+Tab:CreateToggle({
+    Name = "Auto Collect All Brainrots",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(Value)
+
+        autofarm = Value
+
+        if autofarm then
+            task.spawn(function()
+
+                while autofarm do
+
+                    for name, pos in pairs(brainrots) do
+
+                        if not autofarm then
+                            break
+                        end
+
+                        collectBrainrot(pos)
+
+                    end
+
+                    task.wait(2)
+
+                end
+            end)
+        end
+    end
+})
+
+--// BUTTON ZUM BASE POSITION SETZEN
+Tab:CreateButton({
+    Name = "Set Current Position As Base",
+    Callback = function()
+        basePos = hrp.Position
+        Rayfield:Notify({
+            Title = "Base gesetzt",
+            Content = "Deine aktuelle Position wurde gespeichert.",
+            Duration = 3
+        })
+    end
+})
+
+Rayfield:Notify({
+    Title = "Brainrot Hub geladen",
+    Content = "Auto Farm bereit.",
+    Duration = 5
+})
