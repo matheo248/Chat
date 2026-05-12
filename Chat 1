@@ -1,8 +1,8 @@
---// YOGIMINI BRAINROT V7 (CORE-LEVEL DETECTION)
+--// YOGIMINI BRAINROT V8 (ENGINE-EXPLOIT EDITION)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local farming = false
@@ -11,29 +11,43 @@ local basePos = nil
 -- Priorität (Beste zuerst)
 local priority = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
 
--- Funktion: Löst die Interaktion aus
-local function interact(model)
-    -- Suche nach einem ProximityPrompt (der Standard-Weg in Roblox Core)
-    local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+-- Funktion: Versucht das Brainrot mit ALLEN Mitteln aufzusammeln
+local function megaInteract(target)
+    -- 1. Versuch: ProximityPrompt (Engine Standard)
+    local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
     if prompt then
-        fireproximityprompt(prompt) -- Das ist der "Cheat-Code", um E sofort auszulösen
-    else
-        -- Manueller Fallback
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.2)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        fireproximityprompt(prompt)
+    end
+    
+    -- 2. Versuch: ClickDetector (Alter Engine Standard)
+    local cd = target:FindFirstChildWhichIsA("ClickDetector", true)
+    if cd then
+        fireclickdetector(cd)
+    end
+
+    -- 3. Versuch: "E" Taste physisch hämmern
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    
+    -- 4. Versuch: RemoteEvents im ReplicatedStorage triggern (Blind-Versuch)
+    -- Viele Spiele nutzen Events namens "Pickup" oder "Collect"
+    for _, child in ipairs(ReplicatedStorage:GetDescendants()) do
+        if child:IsA("RemoteEvent") and (string.find(child.Name, "Collect") or string.find(child.Name, "Pickup")) then
+            child:FireServer(target)
+        end
     end
 end
 
--- Funktion: Findet das Objekt über Text oder interne Tags
+-- Funktion: Findet das Ziel (Workspace-Klasse optimiert)
 local function getTarget()
-    -- 1. Check nach Seltenheit in TextLabels
     for _, rarity in ipairs(priority) do
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), rarity) then
                 local model = obj:FindFirstAncestorOfClass("Model")
                 if model and not string.find(string.lower(model.Name), "spawner") then
-                    local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                    -- Wir nehmen das RootPart oder das erste Part im Model
+                    local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart", true)
                     if hrp then return model, hrp end
                 end
             end
@@ -43,30 +57,28 @@ local function getTarget()
 end
 
 -- GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "YogiminiCore"
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "YogiminiElite"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 200, 0, 80)
-frame.Position = UDim2.new(0.5, -100, 0.1, 0)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.Position = UDim2.new(0.5, -100, 0.02, 0)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 Instance.new("UICorner", frame)
 
 local btn = Instance.new("TextButton", frame)
 btn.Size = UDim2.new(1, -10, 1, -10)
 btn.Position = UDim2.new(0, 5, 0, 5)
-btn.Text = "ACTIVATE CORE FARM"
-btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-btn.TextColor3 = Color3.new(1,1,1)
+btn.Text = "START ELITE FARM"
+btn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
 btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "FARMING..." or "ACTIVATE CORE FARM"
-    btn.BackgroundColor3 = farming and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(0, 120, 255)
-
+    btn.Text = farming and "RUNNING..." or "START ELITE FARM"
+    
     if farming then
         task.spawn(function()
             while farming do
@@ -78,14 +90,14 @@ btn.MouseButton1Click:Connect(function()
 
                     local targetModel, targetHrp = getTarget()
                     if targetHrp then
-                        -- Teleport: Direkt davor schauen
-                        myHrp.CFrame = CFrame.new(targetHrp.Position + (targetHrp.CFrame.LookVector * 2.5), targetHrp.Position)
+                        -- Teleport: Direkt INS Brainrot hinein (manchmal braucht man Kontakt)
+                        myHrp.CFrame = targetHrp.CFrame
                         
                         task.wait(0.3)
-                        interact(targetModel)
-                        task.wait(0.3)
+                        megaInteract(targetModel)
+                        task.wait(0.2)
                         
-                        -- Schnell zurück
+                        -- Zurück
                         myHrp.CFrame = CFrame.new(basePos)
                         task.wait(0.5)
                     end
