@@ -1,109 +1,87 @@
---// YOGIMINI V12: ULTIMATE AUTO-COLLECT & ESCAPE
+--// YOGIMINI V14: THE MENU-DRIVE (FULL AUTO)
+
+-- Lädt das Script aus deinem Screenshot
+task.spawn(function()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/1H-Steal-The-Brainrot-Base-Auto-Escape-n-Free-Gear-and-more-155757"))()
+end)
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Seltenheiten (Beste zuerst)
-local rarities = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
+-- Seltenheiten wie im Menü (Bild 1000053042.jpg)
+local rarities = {"Admin", "Eternal", "OG", "Divine", "Celestial", "Exclusive", "Godly"}
 
--- Funktion: Das Brainrot wirklich EINSAMMELN (Remote Trigger)
-local function collect(targetModel)
-    -- Wir versuchen das RemoteEvent zu finden, das das Raw-Script nutzt
-    local event = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Collect") 
-                  or ReplicatedStorage:FindFirstChild("Pickup")
-    
-    if event then
-        event:FireServer(targetModel)
-    end
-    
-    -- Fallback: Simuliere ProximityPrompt (für alle Fälle)
-    local prompt = targetModel:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if prompt then
-        fireproximityprompt(prompt)
-    end
-end
-
--- Filter: Nur echte Brainrots (keine Schilder/Shop-Platten)
-local function isValidBrainrot(obj)
-    local text = string.lower(obj.Text)
-    -- Filter Schilder (Bild 1000053036/1000053040)
-    if string.find(text, "spawn") or string.find(text, "in") or string.find(text, "time") then return false end
-    
-    local model = obj:FindFirstAncestorOfClass("Model")
-    if model then
-        -- Filter Shop-Platten
-        if model:FindFirstChild("ImageLabel", true) and string.find(string.lower(model:FindFirstChild("ImageLabel", true).Image), "rbx") then return false end
-        
-        -- Muss ein NPC/Objekt am Boden sein
-        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-        if hrp and hrp.Position.Y < 50 then
-            return model, hrp
-        end
-    end
-    return nil
-end
-
--- Suche das beste Ziel
-local function getBestTarget()
+-- Diese Funktion findet das Modell, aber IGNORIERT die Shop-Knöpfe
+local function getTarget()
     for _, rarity in ipairs(rarities) do
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), rarity) then
-                local model, hrp = isValidBrainrot(obj)
-                if model then return model, hrp end
+            if obj:IsA("TextLabel") and string.find(obj.Text, rarity) then
+                -- Sicherstellen, dass es kein Schild in der Luft oder Shop-Knopf ist
+                local t = string.lower(obj.Text)
+                if not string.find(t, "spawn") and not string.find(t, "in ") then
+                    local model = obj:FindFirstAncestorOfClass("Model")
+                    if model then
+                        -- Check ob es ein flacher Knopf am Boden ist (wie auf deinen Bildern)
+                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                        if hrp and hrp.Size.Y > 1 then -- NPCs sind dicker als Bodenplatten
+                            return model, hrp
+                        end
+                    end
+                end
             end
         end
     end
     return nil
 end
 
--- GUI
+-- GUI für den Autopiloten
 local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.ResetOnSpawn = false
 local btn = Instance.new("TextButton", gui)
 btn.Size = UDim2.new(0, 200, 0, 50)
-btn.Position = UDim2.new(0.5, -100, 0, 20)
-btn.Text = "ACTIVATE GOD-FARM"
-btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+btn.Position = UDim2.new(0.5, -100, 0.25, 0)
+btn.Text = "START V14 AUTO-MODE"
+btn.BackgroundColor3 = Color3.fromRGB(255, 0, 255)
 btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "FARMING ON" or "ACTIVATE GOD-FARM"
-    btn.BackgroundColor3 = farming and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 150)
+    btn.Text = farming and "AUTOPILOT ON" or "START V14 AUTO-MODE"
     
     if farming then
-        -- Setze Flucht-Punkt (Base)
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            basePos = char.HumanoidRootPart.CFrame
+        -- Setze Flucht-Punkt
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            basePos = player.Character.HumanoidRootPart.CFrame
         end
 
         task.spawn(function()
             while farming do
-                local myChar = player.Character
-                local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 
-                if myHrp and basePos then
-                    local targetModel, targetHrp = getBestTarget()
+                if hrp and basePos then
+                    local targetModel, targetHrp = getTarget()
+                    
                     if targetHrp then
-                        -- 1. TELEPORT ZUM TARGET
-                        myHrp.CFrame = targetHrp.CFrame
+                        -- 1. TP zum Brainrot (nutzt die Distanz-Logik vom Menü)
+                        hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 1)
                         task.wait(0.2)
                         
-                        -- 2. AUTO COLLECT
-                        collect(targetModel)
+                        -- 2. AUTOMATISCH AUFHEBEN
+                        -- Wir simulieren E und triggern das Remote, das im Menü-Script steckt
+                        game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(0.1)
+                        game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
                         
-                        -- 3. AUTO ESCAPE (Sofort zurück zur Base)
-                        myHrp.CFrame = basePos
-                        task.wait(0.5)
+                        -- 3. AUTO-ESCAPE (Sofort zurück zur Base)
+                        task.wait(0.1)
+                        hrp.CFrame = basePos
                     end
                 end
-                task.wait(0.5)
+                task.wait(1) -- Kurze Pause, damit der Server nicht kickt
             end
         end)
     end
