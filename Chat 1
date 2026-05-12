@@ -1,33 +1,17 @@
-task.spawn(function()
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
-    local busy = false
+-- WAIT FOR PLAYERGUI SAFE
+local playerGui = player:WaitForChild("PlayerGui")
 
-    while farming do
+-- REMOVE OLD GUI IF EXISTS
+local oldGui = playerGui:FindFirstChild("BrainrotFarmGui")
+if oldGui then
+	oldGui:Destroy()
+end
 
-        for _,pos in ipairs(brainrots) do
-
-            if not farming then break end
-
-            if busy then continue end
-            busy = true
-
-            -- teleport slightly above to avoid ground desync
-            hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
-
-            task.wait(0.15) -- fast stabilize
-
-            -- instant E press
-            pressE()
-
-            -- NO LONG WAIT HERE
-            task.wait(0.1)
-
-            -- instant return
-            hrp.CFrame = CFrame.new(basePos)
-
-            task.wait(0.25) -- tiny buffer only
-
-            busy = false
-        end
-    end
-end)
+-- CREATE GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "BrainrotFarmGui"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
