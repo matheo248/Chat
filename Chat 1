@@ -1,105 +1,85 @@
---// Rayfield FIX
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Brainrot Auto Farm",
-    LoadingTitle = "Brainrot Hub",
+    Name = "Brainrot Farm",
+    LoadingTitle = "Loading...",
     LoadingSubtitle = "by ChatGPT",
     ConfigurationSaving = {
         Enabled = false
     }
 })
 
-local Tab = Window:CreateTab("Auto Farm", 4483362458)
+local Tab = Window:CreateTab("Main", 4483362458)
 
 local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
 
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local vim = game:GetService("VirtualInputManager")
 
--- BASE POSITION
 local basePos = hrp.Position
 
--- BRAINROT POSITIONEN
 local brainrots = {
-    Vector3.new(100,10,200),
-    Vector3.new(150,10,250),
-    Vector3.new(200,10,300),
-    Vector3.new(250,10,350),
-    Vector3.new(300,10,400),
-    Vector3.new(350,10,450)
+    Vector3.new(100,10,100),
+    Vector3.new(120,10,120),
+    Vector3.new(140,10,140),
+    Vector3.new(160,10,160),
+    Vector3.new(180,10,180),
+    Vector3.new(200,10,200)
 }
 
-local autofarm = false
+local farming = false
 
 local function pressE()
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
     task.wait(0.1)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
-local function collect(pos)
-
+local function tp(pos)
     hrp.CFrame = CFrame.new(pos)
-
-    task.wait(1)
-
-    pressE()
-
-    task.wait(1)
-
-    hrp.CFrame = CFrame.new(basePos)
-
-    task.wait(1)
 end
-
-Tab:CreateToggle({
-    Name = "Auto Collect",
-    CurrentValue = false,
-    Flag = "AutoCollect",
-    Callback = function(Value)
-
-        autofarm = Value
-
-        if Value then
-            task.spawn(function()
-
-                while autofarm do
-
-                    for _,pos in ipairs(brainrots) do
-
-                        if not autofarm then
-                            break
-                        end
-
-                        collect(pos)
-
-                    end
-
-                    task.wait(2)
-
-                end
-            end)
-        end
-    end
-})
 
 Tab:CreateButton({
     Name = "Set Base Position",
     Callback = function()
         basePos = hrp.Position
-
-        Rayfield:Notify({
-            Title = "Gespeichert",
-            Content = "Base Position gesetzt",
-            Duration = 3
-        })
     end
 })
 
-Rayfield:Notify({
-    Title = "Loaded",
-    Content = "Brainrot Hub erfolgreich geladen",
-    Duration = 5
+Tab:CreateToggle({
+    Name = "Auto Farm Brainrots",
+    CurrentValue = false,
+    Flag = "Farm",
+    Callback = function(v)
+        farming = v
+
+        if farming then
+            task.spawn(function()
+                while farming do
+
+                    for _,pos in pairs(brainrots) do
+
+                        if not farming then
+                            break
+                        end
+
+                        tp(pos)
+
+                        task.wait(1)
+
+                        pressE()
+
+                        task.wait(1)
+
+                        tp(basePos)
+
+                        task.wait(1)
+                    end
+
+                    task.wait(2)
+                end
+            end)
+        end
+    end
 })
