@@ -1,46 +1,40 @@
---// YOGIMINI BRAINROT REPAIR-V6 (THE FINAL BOSS)
+--// YOGIMINI BRAINROT V7 (CORE-LEVEL DETECTION)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local CollectionService = game:GetService("CollectionService")
 
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Seltenheiten nach Priorität (Beste zuerst!)
-local priorityList = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
+-- Priorität (Beste zuerst)
+local priority = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
 
-local function pressE()
-    task.wait(0.2)
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.3) -- Etwas länger halten für Sicherheit
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+-- Funktion: Löst die Interaktion aus
+local function interact(model)
+    -- Suche nach einem ProximityPrompt (der Standard-Weg in Roblox Core)
+    local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        fireproximityprompt(prompt) -- Das ist der "Cheat-Code", um E sofort auszulösen
+    else
+        -- Manueller Fallback
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.2)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end
 end
 
--- Sucht das BESTE Brainrot auf der Map
-local function findBestBrainrot()
-    local allLabels = {}
-    
-    -- Erstmal alle finden
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("TextLabel") then
-            table.insert(allLabels, obj)
-        end
-    end
-
-    -- Dann die Priorität abfragen
-    for _, rarity in ipairs(priorityList) do
-        for _, label in ipairs(allLabels) do
-            if string.find(string.upper(label.Text), rarity) then
-                local model = label:FindFirstAncestorOfClass("Model")
-                if model then
-                    local isSpawner = string.find(string.lower(model.Name), "spawner") or 
-                                      string.find(string.lower(model.Name), "pad")
-                    
-                    if not isSpawner then
-                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                        if hrp then return hrp end
-                    end
+-- Funktion: Findet das Objekt über Text oder interne Tags
+local function getTarget()
+    -- 1. Check nach Seltenheit in TextLabels
+    for _, rarity in ipairs(priority) do
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), rarity) then
+                local model = obj:FindFirstAncestorOfClass("Model")
+                if model and not string.find(string.lower(model.Name), "spawner") then
+                    local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                    if hrp then return model, hrp end
                 end
             end
         end
@@ -50,28 +44,28 @@ end
 
 -- GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "YogiminiUltra"
+gui.Name = "YogiminiCore"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 200, 0, 80)
-frame.Position = UDim2.new(0.5, -100, 0.05, 0)
-frame.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+frame.Position = UDim2.new(0.5, -100, 0.1, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Instance.new("UICorner", frame)
 
-local toggle = Instance.new("TextButton", frame)
-toggle.Size = UDim2.new(1, -10, 1, -10)
-toggle.Position = UDim2.new(0, 5, 0, 5)
-toggle.Text = "START GOD-FARM"
-toggle.TextScaled = true
-toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toggle.TextColor3 = Color3.new(1,1,1)
-Instance.new("UICorner", toggle)
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(1, -10, 1, -10)
+btn.Position = UDim2.new(0, 5, 0, 5)
+btn.Text = "ACTIVATE CORE FARM"
+btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+btn.TextColor3 = Color3.new(1,1,1)
+btn.TextScaled = true
+Instance.new("UICorner", btn)
 
-toggle.MouseButton1Click:Connect(function()
+btn.MouseButton1Click:Connect(function()
     farming = not farming
-    toggle.Text = farming and "FARMING..." or "START GOD-FARM"
-    toggle.BackgroundColor3 = farming and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(30, 30, 30)
+    btn.Text = farming and "FARMING..." or "ACTIVATE CORE FARM"
+    btn.BackgroundColor3 = farming and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(0, 120, 255)
 
     if farming then
         task.spawn(function()
@@ -82,20 +76,18 @@ toggle.MouseButton1Click:Connect(function()
                 if myHrp then
                     if not basePos then basePos = myHrp.Position end
 
-                    local targetHrp = findBestBrainrot()
+                    local targetModel, targetHrp = getTarget()
                     if targetHrp then
-                        -- TELEPORT MIT BLICKRICHTUNG
-                        -- Wir setzen dich 3 Studs vor das Objekt und lassen dich darauf schauen
-                        local offset = targetHrp.CFrame.LookVector * 3
-                        myHrp.CFrame = CFrame.new(targetHrp.Position + offset, targetHrp.Position)
+                        -- Teleport: Direkt davor schauen
+                        myHrp.CFrame = CFrame.new(targetHrp.Position + (targetHrp.CFrame.LookVector * 2.5), targetHrp.Position)
                         
-                        task.wait(0.4)
-                        pressE()
+                        task.wait(0.3)
+                        interact(targetModel)
                         task.wait(0.3)
                         
-                        -- ZURÜCK
+                        -- Schnell zurück
                         myHrp.CFrame = CFrame.new(basePos)
-                        task.wait(0.8)
+                        task.wait(0.5)
                     end
                 end
                 task.wait(0.5)
