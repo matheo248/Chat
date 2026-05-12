@@ -1,42 +1,55 @@
---// YOGIMINI V16: HYBRID ENGINE (GITHUB INTEGRATION)
-
--- 1. Wir laden DEIN neues Skript als Motor
-task.spawn(function()
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/KhSaeed90/Roblox/refs/heads/workspace/103050497819513"))()
-    end)
-end)
+--// YOGIMINI V17: ROBUX-SHIELD & ANTI-BASE-STEAL
 
 local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Seltenheiten
+-- ALARM: Wenn ein Kauf-Fenster aufgeht, stoppt ALLES
+MarketplaceService.PromptGamePassPurchaseFinished:Connect(function() farming = false end)
+MarketplaceService.PromptPurchaseFinished:Connect(function() farming = false end)
+
+local function stopRobuxSpending()
+    -- Checkt ob ein Kauf-Dialog von Roblox offen ist
+    if GuiService:IsTenFootInterface() or MarketplaceService:GetProductInfo(1, Enum.InfoType.Product) then
+        -- Falls ein Fenster offen ist, sofort Farmen aus!
+        if farming then
+            farming = false
+            warn("!!! ROBUX-KAUF ERKANNT - FARMEN GESTOPPT !!!")
+        end
+    end
+end
+
 local rarities = {"Admin", "Eternal", "OG", "Divine", "Celestial", "Exclusive", "Godly"}
 
--- Der "Safe-Check": Ist das Ziel ein echter Brainrot oder nur Deko/Spieler?
-local function getSafeTarget()
+local function getSuperSafeTarget()
+    stopRobuxSpending() -- Sicherheits-Check
+    
     for _, rarity in ipairs(rarities) do
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), string.upper(rarity)) then
                 
-                -- FILTER 1: Keine Schilder in der Luft (aus Bild 1000053036.jpg)
-                local t = string.lower(obj.Text)
-                if string.find(t, "spawn") or string.find(t, "in ") then continue end
-                
                 local model = obj:FindFirstAncestorOfClass("Model")
                 if model then
-                    -- FILTER 2: Keine anderen Spieler (aus deinem letzten Problem)
-                    if Players:GetPlayerFromCharacter(model) then continue end
-                    
-                    -- FILTER 3: Keine Shop-Knöpfe (aus Bild 1000053018.jpg)
                     local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                    if hrp and hrp.Size.Y > 1 then
-                        -- FILTER 4: Nur Sachen in der Mitte (nicht in fremden Basen)
-                        if (hrp.Position - Vector3.new(0,0,0)).Magnitude < 500 then
-                            return model, hrp
+                    if hrp then
+                        -- 1. SICHERHEIT: Nur Ziele in der neutralen MITTE
+                        -- Die Basen der Spieler sind meistens weit weg vom Nullpunkt (0,0,0)
+                        local distFromCenter = (hrp.Position * Vector3.new(1,0,1)).Magnitude
+                        if distFromCenter > 250 then continue end -- Alles über 250m Entfernung ist Base-Gefahr!
+
+                        -- 2. SICHERHEIT: Kein Spieler-Name im Pfad
+                        local path = model:GetFullName():lower()
+                        if string.find(path, "base") or string.find(path, "plot") or string.find(path, "player") then
+                            continue 
                         end
+
+                        -- 3. SICHERHEIT: Nicht zu flach (Shop-Knopf Filter)
+                        if hrp.Size.Y < 1.2 then continue end
+
+                        return model, hrp
                     end
                 end
             end
@@ -49,47 +62,41 @@ end
 local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.ResetOnSpawn = false
 local btn = Instance.new("TextButton", gui)
-btn.Size = UDim2.new(0, 220, 0, 60)
-btn.Position = UDim2.new(0.5, -110, 0.2, 0)
-btn.Text = "V16: START HYBRID-FARM"
-btn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+btn.Size = UDim2.new(0, 250, 0, 60)
+btn.Position = UDim2.new(0.5, -125, 0.1, 0)
+btn.Text = "V17: ROBUX SHIELD ACTIVE"
+btn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
 btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "HYBRID ACTIVE" or "START HYBRID-FARM"
-    
-    if farming then
-        -- Speicher deinen sicheren Standpunkt
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            basePos = player.Character.HumanoidRootPart.CFrame
-        end
+    btn.Text = farming and "SHIELD ON: FARMING" or "V17: START SAFE FARM"
+    btn.BackgroundColor3 = farming and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 100)
 
+    if farming then
+        basePos = player.Character.HumanoidRootPart.CFrame
+        
         task.spawn(function()
             while farming do
-                local char = player.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                
-                if hrp and basePos then
-                    local targetModel, targetHrp = getSafeTarget()
+                -- Extra Check gegen offene Fenster
+                if GuiService.MenuOpened then farming = false break end
+
+                local targetModel, targetHrp = getSuperSafeTarget()
+                if targetHrp and farming then
+                    -- TP zum Ziel
+                    player.Character.HumanoidRootPart.CFrame = targetHrp.CFrame
+                    task.wait(0.3)
                     
-                    if targetHrp then
-                        -- Blitz-Teleport zum Ziel
-                        hrp.CFrame = targetHrp.CFrame
-                        task.wait(0.2)
-                        
-                        -- Nutze die Collect-Funktion
-                        game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(0.1)
-                        game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                        
-                        -- Sofortiger Rückzug (Escape)
-                        task.wait(0.1)
-                        hrp.CFrame = basePos
-                    end
+                    -- Nur E drücken, wenn KEIN Kaufmenü da ist
+                    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.1)
+                    game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    
+                    task.wait(0.2)
+                    player.Character.HumanoidRootPart.CFrame = basePos
                 end
-                task.wait(1)
+                task.wait(1.5)
             end
         end)
     end
