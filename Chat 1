@@ -1,5 +1,5 @@
---// Rayfield
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+--// Rayfield FIX
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
 
 local Window = Rayfield:CreateWindow({
     Name = "Brainrot Auto Farm",
@@ -18,63 +18,62 @@ local hrp = character:WaitForChild("HumanoidRootPart")
 
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
---// DEINE BASE POSITION
-local basePos = Vector3.new(0,10,0)
+-- BASE POSITION
+local basePos = hrp.Position
 
---// BRAINROT POSITIONEN
+-- BRAINROT POSITIONEN
 local brainrots = {
-    ["Exclusive"] = Vector3.new(100,10,200),
-    ["OG"] = Vector3.new(150,10,250),
-    ["Divine"] = Vector3.new(200,10,300),
-    ["Celestial"] = Vector3.new(250,10,350),
-    ["Eternal"] = Vector3.new(300,10,400),
-    ["Admin"] = Vector3.new(350,10,450)
+    Vector3.new(100,10,200),
+    Vector3.new(150,10,250),
+    Vector3.new(200,10,300),
+    Vector3.new(250,10,350),
+    Vector3.new(300,10,400),
+    Vector3.new(350,10,450)
 }
 
 local autofarm = false
 
---// TELEPORT + E
-local function collectBrainrot(pos)
+local function pressE()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+end
 
-    -- teleport zum brainrot
+local function collect(pos)
+
     hrp.CFrame = CFrame.new(pos)
 
     task.wait(1)
 
-    -- E drücken
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.1)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    pressE()
 
     task.wait(1)
 
-    -- zurück zur base
     hrp.CFrame = CFrame.new(basePos)
 
     task.wait(1)
 end
 
---// TOGGLE
 Tab:CreateToggle({
-    Name = "Auto Collect All Brainrots",
+    Name = "Auto Collect",
     CurrentValue = false,
-    Flag = "AutoFarm",
+    Flag = "AutoCollect",
     Callback = function(Value)
 
         autofarm = Value
 
-        if autofarm then
+        if Value then
             task.spawn(function()
 
                 while autofarm do
 
-                    for name, pos in pairs(brainrots) do
+                    for _,pos in ipairs(brainrots) do
 
                         if not autofarm then
                             break
                         end
 
-                        collectBrainrot(pos)
+                        collect(pos)
 
                     end
 
@@ -86,21 +85,21 @@ Tab:CreateToggle({
     end
 })
 
---// BUTTON ZUM BASE POSITION SETZEN
 Tab:CreateButton({
-    Name = "Set Current Position As Base",
+    Name = "Set Base Position",
     Callback = function()
         basePos = hrp.Position
+
         Rayfield:Notify({
-            Title = "Base gesetzt",
-            Content = "Deine aktuelle Position wurde gespeichert.",
+            Title = "Gespeichert",
+            Content = "Base Position gesetzt",
             Duration = 3
         })
     end
 })
 
 Rayfield:Notify({
-    Title = "Brainrot Hub geladen",
-    Content = "Auto Farm bereit.",
+    Title = "Loaded",
+    Content = "Brainrot Hub erfolgreich geladen",
     Duration = 5
 })
