@@ -1,4 +1,4 @@
---// YOGIMINI BRAINROT REPAIR-V3 (The Button-Killer)
+--// YOGIMINI BRAINROT REPAIR-V4 (TEXT-DETECTION EDITION)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -7,70 +7,69 @@ local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Liste der Seltenheiten
-local targetNames = {"Exclusive", "OG", "Divine", "Eternal", "Celestial", "Admin"}
+-- Seltenheiten, nach denen wir im TEXT suchen
+local targetRarities = {"EXCLUSIVE", "GODLY", "DIVINE", "OG", "ETERNAL", "CELESTIAL", "ADMIN", "SECRET"}
 
--- Funktion zum E-Drücken (via ProximityPrompt, falls vorhanden)
-local function interact(target)
-    local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if prompt then
-        fireproximityprompt(prompt) -- Direktes Auslösen (geht schneller)
-    else
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.1)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    end
+-- Funktion zum Interagieren (E drücken)
+local function pressE()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.15)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
--- NEUE SUCHE: Sucht nur nach beweglichen Objekten, nicht nach festen Bodenplatten
-local function findRealBrainrot(namePart)
+-- Die neue schlaue Suchfunktion
+local function findCorrectBrainrot()
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- Es muss den Namen enthalten
-        if string.find(obj.Name, namePart) then
-            -- CHECK: Ist es eine Bodenplatte? (Anhand deines Bildes 1000053014.jpg)
-            -- Echte Brainrots sind meistens Models oder Parts, die NICHT flach auf dem Boden liegen wie die Buttons
-            local isPlate = false
-            if obj:IsA("BasePart") and obj.Size.Y < 1 then isPlate = true end
+        -- Wir suchen nach TextLabels (die den Namen/Seltenheit anzeigen)
+        if obj:IsA("TextLabel") then
+            local text = string.upper(obj.Text)
             
-            -- CHECK: Hat es ein Robux-Zeichen oder Text drüber? (Shop-Indikator)
-            if obj:FindFirstChild("BillboardGui") or obj:FindFirstChild("SurfaceGui") then
-                -- Wir ignorieren es, wenn es wie ein Shop-Button aussieht
-                if not obj:FindFirstChildWhichIsA("ProximityPrompt", true) then
-                    isPlate = true
+            for _, rarity in ipairs(targetRarities) do
+                if string.find(text, rarity) then
+                    -- Wir haben den Text gefunden! Jetzt holen wir uns das dazugehörige Teil.
+                    local targetPart = obj:FindFirstAncestorWhichIsA("BasePart") or obj:FindFirstAncestorWhichIsA("Model")
+                    
+                    if targetPart then
+                        -- Sicherheits-Check: Ist es weit genug weg vom Spawn/Shop?
+                        -- (Die Shop-Knöpfe sind meistens an einer festen Stelle)
+                        local distFromBase = basePos and (targetPart:GetPivot().Position - basePos).Magnitude or 100
+                        
+                        if distFromBase > 15 then 
+                            return targetPart
+                        end
+                    end
                 end
-            end
-
-            if not isPlate then
-                return obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
             end
         end
     end
     return nil
 end
 
--- GUI (Bleibt gleich, weil sie ja gut funktioniert)
+-- GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "YogiminiFinal"
+gui.Name = "YogiminiFinalBoss"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 100)
-frame.Position = UDim2.new(0.5, -100, 0.1, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Size = UDim2.new(0, 200, 0, 80)
+frame.Position = UDim2.new(0.5, -100, 0.05, 0)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BackgroundTransparency = 0.3
 Instance.new("UICorner", frame)
 
 local toggle = Instance.new("TextButton", frame)
-toggle.Size = UDim2.new(0, 160, 0, 40)
-toggle.Position = UDim2.new(0.5, -80, 0.5, -20)
-toggle.Text = "START FARM"
-toggle.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+toggle.Size = UDim2.new(0, 180, 0, 60)
+toggle.Position = UDim2.new(0.5, -90, 0.5, -30)
+toggle.Text = "START BRAINROT FARM"
+toggle.BackgroundColor3 = Color3.fromRGB(255, 0, 150)
+toggle.TextColor3 = Color3.new(1,1,1)
 toggle.TextScaled = true
 Instance.new("UICorner", toggle)
 
--- FARMING LOGIK
+-- FARMING SCHLEIFE
 toggle.MouseButton1Click:Connect(function()
     farming = not farming
-    toggle.Text = farming and "STOP FARM" or "START FARM"
+    toggle.Text = farming and "STOP" or "START BRAINROT"
     
     if farming then
         task.spawn(function()
@@ -81,22 +80,19 @@ toggle.MouseButton1Click:Connect(function()
                 if hrp then
                     if not basePos then basePos = hrp.Position end
 
-                    for _, name in ipairs(targetNames) do
-                        if not farming then break end
+                    local target = findCorrectBrainrot()
+                    if target then
+                        -- Teleport zum Brainrot (nutzt Pivot für Models)
+                        local targetPos = target:GetPivot().Position
+                        hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
                         
-                        local target = findRealBrainrot(name)
-                        if target then
-                            -- Teleport zum echten Brainrot
-                            hrp.CFrame = target.CFrame * CFrame.new(0, 3, 0)
-                            task.wait(0.3)
-                            
-                            interact(target)
-                            task.wait(0.3)
-                            
-                            -- Sofort zurück zur Home-Base
-                            hrp.CFrame = CFrame.new(basePos)
-                            task.wait(0.5)
-                        end
+                        task.wait(0.4)
+                        pressE()
+                        task.wait(0.2)
+                        
+                        -- Sofort zurück nach Hause
+                        hrp.CFrame = CFrame.new(basePos)
+                        task.wait(0.8)
                     end
                 end
                 task.wait(0.5)
