@@ -1,17 +1,113 @@
+--// YOGIMINI ULTIMATE BRAINROT AUTO-FARM (Fixed & Smart)
+
 local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
+local farming = false
+local basePos = nil
 
--- WAIT FOR PLAYERGUI SAFE
-local playerGui = player:WaitForChild("PlayerGui")
+-- Liste der Namen, nach denen gesucht werden soll
+local targetNames = {"Exclusive", "OG", "Divine", "Eternal", "Celestial", "Admin"}
 
--- REMOVE OLD GUI IF EXISTS
-local oldGui = playerGui:FindFirstChild("BrainrotFarmGui")
-if oldGui then
-	oldGui:Destroy()
+-- Funktion zum Drücken der E-Taste
+local function pressE()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.2)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
--- CREATE GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "BrainrotFarmGui"
+-- Funktion: Finde das nächste Brainrot-Objekt im Workspace
+local function findTarget(namePart)
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            if string.find(obj.Name, namePart) then
+                return obj:IsA("Model") and obj.PrimaryPart or obj
+            end
+        end
+    end
+    return nil
+end
+
+-- GUI Erstellung
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "YogiminiFarm"
 gui.ResetOnSpawn = false
-gui.Parent = playerGui
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0.5, -100, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(40, 0, 70) -- Schickes Lila/Dunkel
+frame.BorderSizePixel = 0
+
+local corner = Instance.new("UICorner", frame)
+
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(0, 160, 0, 40)
+toggle.Position = UDim2.new(0.5, -80, 0.5, -20)
+toggle.Text = "START FARM"
+toggle.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+toggle.TextColor3 = Color3.new(1,1,1)
+toggle.TextScaled = true
+Instance.new("UICorner", toggle)
+
+-- Dragging Support für Mobile
+local dragging, dragInput, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+end)
+
+-- FARMING LOGIK
+toggle.MouseButton1Click:Connect(function()
+    farming = not farming
+    toggle.Text = farming and "STOP FARM" or "START FARM"
+    toggle.BackgroundColor3 = farming and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(0, 200, 100)
+
+    if farming then
+        task.spawn(function()
+            while farming do
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                
+                if hrp then
+                    -- Setze Base Position beim Start, falls noch nicht geschehen
+                    if not basePos then basePos = hrp.Position end
+
+                    for _, name in ipairs(targetNames) do
+                        if not farming then break end
+                        
+                        local target = findTarget(name)
+                        if target then
+                            -- 1. Hin-Teleportieren
+                            hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0) -- Teleport etwas über das Objekt
+                            task.wait(0.5)
+                            
+                            -- 2. E Drücken
+                            pressE()
+                            task.wait(0.5)
+                            
+                            -- 3. Zurück nach Hause
+                            hrp.CFrame = CFrame.new(basePos)
+                            task.wait(1)
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end)
