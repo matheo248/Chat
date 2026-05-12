@@ -1,53 +1,64 @@
---// YOGIMINI V17: ROBUX-SHIELD & ANTI-BASE-STEAL
+--// YOGIMINI V18: THE FINAL BARRIER (ANTI-ROBUX & AREA-LOCK)
 
 local Players = game:GetService("Players")
-local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- ALARM: Wenn ein Kauf-Fenster aufgeht, stoppt ALLES
-MarketplaceService.PromptGamePassPurchaseFinished:Connect(function() farming = false end)
-MarketplaceService.PromptPurchaseFinished:Connect(function() farming = false end)
-
-local function stopRobuxSpending()
-    -- Checkt ob ein Kauf-Dialog von Roblox offen ist
-    if GuiService:IsTenFootInterface() or MarketplaceService:GetProductInfo(1, Enum.InfoType.Product) then
-        -- Falls ein Fenster offen ist, sofort Farmen aus!
-        if farming then
-            farming = false
-            warn("!!! ROBUX-KAUF ERKANNT - FARMEN GESTOPPT !!!")
-        end
-    end
-end
-
+-- Seltenheiten (Priorität)
 local rarities = {"Admin", "Eternal", "OG", "Divine", "Celestial", "Exclusive", "Godly"}
 
-local function getSuperSafeTarget()
-    stopRobuxSpending() -- Sicherheits-Check
+-- SICHERHEITS-FUNKTION: Prüft auf Kauf-Fenster
+local function isPurchaseWindowOpen()
+    if MarketplaceService:GetProductInfo(1, Enum.InfoType.Product) then -- Checkt die Engine auf Kauf-Anfragen
+        return true
+    end
+    return false
+end
+
+-- FUNKTION: Prüft ob das Ziel in einer verbotenen Kauf-Zone liegt
+local function isInShopArea(targetPos)
+    -- Die Shop-Platten und Kauf-NPCs stehen fast immer an festen Koordinaten am Spawn
+    -- Wir messen die Distanz zum Zentrum des Spawns (0, 10, 0 ist oft der Standard-Spawn)
+    local spawnCenter = Vector3.new(0, 0, 0) 
+    local distToSpawn = (targetPos * Vector3.new(1,0,1) - spawnCenter).Magnitude
     
+    -- Wenn das Ziel näher als 150 Meter am Spawn ist, ist es vermutlich ein Shop-NPC
+    if distToSpawn < 150 then
+        return true
+    end
+    return false
+end
+
+local function getValidTarget()
     for _, rarity in ipairs(rarities) do
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), string.upper(rarity)) then
+                
+                -- Filter gegen Schilder (Bild 1000053036.jpg)
+                local t = string.lower(obj.Text)
+                if string.find(t, "spawn") or string.find(t, "in ") then continue end
                 
                 local model = obj:FindFirstAncestorOfClass("Model")
                 if model then
                     local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
                     if hrp then
-                        -- 1. SICHERHEIT: Nur Ziele in der neutralen MITTE
-                        -- Die Basen der Spieler sind meistens weit weg vom Nullpunkt (0,0,0)
-                        local distFromCenter = (hrp.Position * Vector3.new(1,0,1)).Magnitude
-                        if distFromCenter > 250 then continue end -- Alles über 250m Entfernung ist Base-Gefahr!
+                        -- 1. ZONE-CHECK: Ist es im Shop-Bereich?
+                        if isInShopArea(hrp.Position) then continue end
 
-                        -- 2. SICHERHEIT: Kein Spieler-Name im Pfad
-                        local path = model:GetFullName():lower()
-                        if string.find(path, "base") or string.find(path, "plot") or string.find(path, "player") then
-                            continue 
+                        -- 2. ROBUX-ICON-CHECK: Hat das Modell ein Kauf-Bild?
+                        local hasRobuxIcon = false
+                        for _, d in ipairs(model:GetDescendants()) do
+                            if d:IsA("ImageLabel") and string.find(string.lower(d.Image), "rbx") then
+                                hasRobuxIcon = true
+                                break
+                            end
                         end
+                        if hasRobuxIcon then continue end
 
-                        -- 3. SICHERHEIT: Nicht zu flach (Shop-Knopf Filter)
-                        if hrp.Size.Y < 1.2 then continue end
+                        -- 3. PLAYER-CHECK: Gehört es einem Spieler?
+                        if Players:GetPlayerFromCharacter(model) then continue end
 
                         return model, hrp
                     end
@@ -60,43 +71,54 @@ end
 
 -- GUI
 local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "YogiminiV18"
 gui.ResetOnSpawn = false
+
 local btn = Instance.new("TextButton", gui)
 btn.Size = UDim2.new(0, 250, 0, 60)
-btn.Position = UDim2.new(0.5, -125, 0.1, 0)
-btn.Text = "V17: ROBUX SHIELD ACTIVE"
-btn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+btn.Position = UDim2.new(0.5, -125, 0.05, 0)
+btn.Text = "V18: ANTI-ROBUX FARM"
+btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0) -- Rot für Alarm-Bereitschaft
+btn.TextColor3 = Color3.new(1,1,1)
 btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "SHIELD ON: FARMING" or "V17: START SAFE FARM"
-    btn.BackgroundColor3 = farming and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 100)
+    btn.Text = farming and "PROTECTED FARMING..." or "V18: START SAFE FARM"
+    btn.BackgroundColor3 = farming and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(200, 0, 0)
 
     if farming then
-        basePos = player.Character.HumanoidRootPart.CFrame
-        
+        -- Setze BasePos weit weg vom Shop!
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            basePos = player.Character.HumanoidRootPart.CFrame
+        end
+
         task.spawn(function()
             while farming do
-                -- Extra Check gegen offene Fenster
-                if GuiService.MenuOpened then farming = false break end
+                -- STOPP, wenn ein Kauf-Fenster erscheint!
+                if isPurchaseWindowOpen() then 
+                    farming = false 
+                    btn.Text = "STOPPED: ROBUX RISK!"
+                    break 
+                end
 
-                local targetModel, targetHrp = getSuperSafeTarget()
+                local targetModel, targetHrp = getValidTarget()
                 if targetHrp and farming then
-                    -- TP zum Ziel
-                    player.Character.HumanoidRootPart.CFrame = targetHrp.CFrame
+                    -- Teleport
+                    player.Character.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
                     task.wait(0.3)
                     
-                    -- Nur E drücken, wenn KEIN Kaufmenü da ist
+                    -- Interagieren
                     game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
                     task.wait(0.1)
                     game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
                     
+                    -- Escape
                     task.wait(0.2)
                     player.Character.HumanoidRootPart.CFrame = basePos
                 end
-                task.wait(1.5)
+                task.wait(1.2)
             end
         end)
     end
