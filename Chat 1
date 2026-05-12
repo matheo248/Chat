@@ -1,7 +1,9 @@
---// YOGIMINI V18: THE FINAL BARRIER (ANTI-ROBUX & AREA-LOCK)
+--// YOGIMINI V19: REMOTE-STEAL & FAILSAFE
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
+
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
@@ -9,58 +11,47 @@ local basePos = nil
 -- Seltenheiten (Priorität)
 local rarities = {"Admin", "Eternal", "OG", "Divine", "Celestial", "Exclusive", "Godly"}
 
--- SICHERHEITS-FUNKTION: Prüft auf Kauf-Fenster
-local function isPurchaseWindowOpen()
-    if MarketplaceService:GetProductInfo(1, Enum.InfoType.Product) then -- Checkt die Engine auf Kauf-Anfragen
-        return true
+-- SICHERHEIT: Sofortiger Abbruch wenn Robux-Fenster erscheint
+MarketplaceService.PromptPurchaseRequested:Connect(function()
+    farming = false
+    print("ROBUX GEFAHR! FARMEN GESTOPPT.")
+end)
+
+-- FUNKTION: Das 'Steal' Event finden und feuern (Referenz: RemoteEvent Klasse)
+local function remoteSteal(targetModel)
+    -- Wir suchen nach dem Event, das den 'Steal' Befehl an den Server sendet
+    -- Viele Spiele verstecken es in ReplicatedStorage unter 'Remotes' oder 'Events'
+    local remote = ReplicatedStorage:FindFirstChild("Steal", true) or 
+                   ReplicatedStorage:FindFirstChild("Collect", true) or
+                   ReplicatedStorage:FindFirstChild("Pickup", true)
+
+    if remote and remote:IsA("RemoteEvent") then
+        -- Wir senden das Signal direkt an den Server
+        remote:FireServer(targetModel)
     end
-    return false
 end
 
--- FUNKTION: Prüft ob das Ziel in einer verbotenen Kauf-Zone liegt
-local function isInShopArea(targetPos)
-    -- Die Shop-Platten und Kauf-NPCs stehen fast immer an festen Koordinaten am Spawn
-    -- Wir messen die Distanz zum Zentrum des Spawns (0, 10, 0 ist oft der Standard-Spawn)
-    local spawnCenter = Vector3.new(0, 0, 0) 
-    local distToSpawn = (targetPos * Vector3.new(1,0,1) - spawnCenter).Magnitude
-    
-    -- Wenn das Ziel näher als 150 Meter am Spawn ist, ist es vermutlich ein Shop-NPC
-    if distToSpawn < 150 then
-        return true
-    end
-    return false
-end
-
-local function getValidTarget()
+-- Der ultimative Filter: Nur echte NPCs, keine Kauf-Platten
+local function getRealBrainrot()
     for _, rarity in ipairs(rarities) do
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), string.upper(rarity)) then
                 
-                -- Filter gegen Schilder (Bild 1000053036.jpg)
-                local t = string.lower(obj.Text)
-                if string.find(t, "spawn") or string.find(t, "in ") then continue end
+                -- Filter gegen Schilder in der Luft (1000053036.jpg)
+                if string.find(obj.Text:lower(), "spawn") then continue end
                 
                 local model = obj:FindFirstAncestorOfClass("Model")
                 if model then
+                    -- FILTER: Wenn das Modell ein 'Purchase' oder 'Robux' Tag hat, ignorieren
+                    if model:FindFirstChild("Price") or model:FindFirstChild("Currency") then continue end
+                    
                     local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
                     if hrp then
-                        -- 1. ZONE-CHECK: Ist es im Shop-Bereich?
-                        if isInShopArea(hrp.Position) then continue end
-
-                        -- 2. ROBUX-ICON-CHECK: Hat das Modell ein Kauf-Bild?
-                        local hasRobuxIcon = false
-                        for _, d in ipairs(model:GetDescendants()) do
-                            if d:IsA("ImageLabel") and string.find(string.lower(d.Image), "rbx") then
-                                hasRobuxIcon = true
-                                break
-                            end
+                        -- Check: Nur NPCs die auf dem Boden stehen (keine Shop-Anzeigen)
+                        -- Echte Brainrots sind meistens hinter Gittern (Foto 1000053040.jpg)
+                        if hrp.Position.Y < 40 and hrp.Size.Y > 1.5 then
+                            return model, hrp
                         end
-                        if hasRobuxIcon then continue end
-
-                        -- 3. PLAYER-CHECK: Gehört es einem Spieler?
-                        if Players:GetPlayerFromCharacter(model) then continue end
-
-                        return model, hrp
                     end
                 end
             end
@@ -69,56 +60,49 @@ local function getValidTarget()
     return nil
 end
 
--- GUI
+-- GUI (Version 19)
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "YogiminiV18"
+gui.Name = "YogiminiV19"
 gui.ResetOnSpawn = false
 
 local btn = Instance.new("TextButton", gui)
 btn.Size = UDim2.new(0, 250, 0, 60)
-btn.Position = UDim2.new(0.5, -125, 0.05, 0)
-btn.Text = "V18: ANTI-ROBUX FARM"
-btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0) -- Rot für Alarm-Bereitschaft
+btn.Position = UDim2.new(0.5, -125, 0.1, 0)
+btn.Text = "V19: REMOTE STEAL (SAFE)"
+btn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 btn.TextColor3 = Color3.new(1,1,1)
 btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "PROTECTED FARMING..." or "V18: START SAFE FARM"
-    btn.BackgroundColor3 = farming and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(200, 0, 0)
+    btn.Text = farming and "REMOTE FARMING..." or "START V19"
+    btn.BackgroundColor3 = farming and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(0, 150, 255)
 
     if farming then
-        -- Setze BasePos weit weg vom Shop!
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            basePos = player.Character.HumanoidRootPart.CFrame
-        end
-
+        basePos = player.Character.HumanoidRootPart.CFrame
+        
         task.spawn(function()
             while farming do
-                -- STOPP, wenn ein Kauf-Fenster erscheint!
-                if isPurchaseWindowOpen() then 
-                    farming = false 
-                    btn.Text = "STOPPED: ROBUX RISK!"
-                    break 
-                end
-
-                local targetModel, targetHrp = getValidTarget()
-                if targetHrp and farming then
-                    -- Teleport
-                    player.Character.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
-                    task.wait(0.3)
-                    
-                    -- Interagieren
-                    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                    task.wait(0.1)
-                    game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                    
-                    -- Escape
+                local target, hrp = getRealBrainrot()
+                
+                if hrp and farming then
+                    -- 1. TELEPORT (Etwas über das Ziel, um Kauf-Zonen am Boden zu vermeiden)
+                    player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
                     task.wait(0.2)
+                    
+                    -- 2. REMOTE STEAL (Server-Signal statt E-Taste)
+                    remoteSteal(target)
+                    
+                    -- 3. FALLBACK: ProximityPrompt (falls vorhanden)
+                    local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    if prompt then fireproximityprompt(prompt) end
+                    
+                    task.wait(0.2)
+                    -- 4. ESCAPE
                     player.Character.HumanoidRootPart.CFrame = basePos
                 end
-                task.wait(1.2)
+                task.wait(1)
             end
         end)
     end
