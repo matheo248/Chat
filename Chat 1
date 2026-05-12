@@ -1,71 +1,138 @@
-local player = game.Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
+--// SIMPLE DELTA MOBILE VERSION
 
-local vim = game:GetService("VirtualInputManager")
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+-- BASE POSITION
 local basePos = hrp.Position
 
+-- BRAINROT POSITIONS (ÄNDERN!)
 local brainrots = {
-    Vector3.new(100,10,100),
-    Vector3.new(120,10,120),
-    Vector3.new(140,10,140),
-    Vector3.new(160,10,160),
-    Vector3.new(180,10,180)
+    Vector3.new(100,10,100), -- Exclusive
+    Vector3.new(120,10,120), -- OG
+    Vector3.new(140,10,140), -- Divine
+    Vector3.new(160,10,160), -- Eternal
+    Vector3.new(180,10,180), -- Celestial
+    Vector3.new(200,10,200)  -- Admin
 }
 
 local farming = false
 
 -- GUI
-local gui = Instance.new("ScreenGui", game.CoreGui)
+local gui = Instance.new("ScreenGui")
+gui.Name = "BrainrotFarmGui"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,250,0,150)
-frame.Position = UDim2.new(0.5,-125,0.5,-75)
-frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+local frame = Instance.new("Frame")
+frame.Parent = gui
+frame.Size = UDim2.new(0,220,0,140)
+frame.Position = UDim2.new(0.5,-110,0.5,-70)
+frame.BackgroundColor3 = Color3.fromRGB(35,35,35)
 
-local toggle = Instance.new("TextButton", frame)
-toggle.Size = UDim2.new(0,200,0,50)
-toggle.Position = UDim2.new(0,25,0,50)
-toggle.Text = "AUTO FARM: OFF"
+local title = Instance.new("TextLabel")
+title.Parent = frame
+title.Size = UDim2.new(1,0,0,40)
+title.BackgroundTransparency = 1
+title.Text = "Brainrot Auto Farm"
+title.TextScaled = true
+title.TextColor3 = Color3.new(1,1,1)
+
+local toggle = Instance.new("TextButton")
+toggle.Parent = frame
+toggle.Size = UDim2.new(0,180,0,50)
+toggle.Position = UDim2.new(0,20,0,70)
+toggle.Text = "START FARM"
 toggle.TextScaled = true
+toggle.BackgroundColor3 = Color3.fromRGB(0,170,255)
+toggle.TextColor3 = Color3.new(1,1,1)
 
+-- DRAG
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- E PRESS
 local function pressE()
-    vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
     task.wait(0.1)
-    vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
+-- TOGGLE
 toggle.MouseButton1Click:Connect(function()
 
     farming = not farming
 
-    toggle.Text = farming and "AUTO FARM: ON" or "AUTO FARM: OFF"
-
     if farming then
+        toggle.Text = "STOP FARM"
+
         task.spawn(function()
 
             while farming do
 
-                for _,pos in pairs(brainrots) do
+                for _,pos in ipairs(brainrots) do
 
                     if not farming then
                         break
                     end
 
+                    -- teleport
                     hrp.CFrame = CFrame.new(pos)
 
                     task.wait(1)
 
+                    -- press E
                     pressE()
 
                     task.wait(1)
 
+                    -- back to base
                     hrp.CFrame = CFrame.new(basePos)
 
-                    task.wait(1)
+                    task.wait(1.5)
                 end
             end
         end)
+
+    else
+        toggle.Text = "START FARM"
     end
 end)
