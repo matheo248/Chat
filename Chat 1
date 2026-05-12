@@ -1,4 +1,4 @@
---// YOGIMINI BRAINROT REPAIR-V5 (THE NPC-DETECTOR)
+--// YOGIMINI BRAINROT REPAIR-V6 (THE FINAL BOSS)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -7,43 +7,39 @@ local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Seltenheiten (Großbuchstaben für den Text-Check)
-local targetRarities = {"EXCLUSIVE", "GODLY", "DIVINE", "OG", "ETERNAL", "CELESTIAL", "ADMIN", "SECRET"}
+-- Seltenheiten nach Priorität (Beste zuerst!)
+local priorityList = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
 
--- Funktion zum E-Drücken
 local function pressE()
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
     task.wait(0.2)
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.3) -- Etwas länger halten für Sicherheit
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
--- Die INTELLIGENTE Suchfunktion
-local function findActualBrainrot()
+-- Sucht das BESTE Brainrot auf der Map
+local function findBestBrainrot()
+    local allLabels = {}
+    
+    -- Erstmal alle finden
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- 1. Wir suchen nach dem TextLabel (wie auf dem Foto)
         if obj:IsA("TextLabel") then
-            local text = string.upper(obj.Text)
-            
-            for _, rarity in ipairs(targetRarities) do
-                if string.find(text, rarity) then
-                    
-                    -- 2. Wir haben den Text gefunden. Jetzt suchen wir das Model dazu.
-                    local model = obj:FindFirstAncestorOfClass("Model")
-                    if model then
-                        -- 3. DER ENTSCHEIDENDE CHECK:
-                        -- Ein Spawner hat keinen "Humanoid". Ein Brainrot (NPC) schon!
-                        -- Oder wir prüfen, ob der Name des Models "Spawner" enthält.
-                        local isSpawner = string.find(string.lower(model.Name), "spawner") or 
-                                          string.find(string.lower(model.Name), "pad") or
-                                          string.find(string.lower(model.Name), "button")
+            table.insert(allLabels, obj)
+        end
+    end
 
-                        if not isSpawner then
-                            -- Wenn es ein Model mit einem RootPart ist, ist es unser Brainrot
-                            local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                            if hrp then
-                                return hrp
-                            end
-                        end
+    -- Dann die Priorität abfragen
+    for _, rarity in ipairs(priorityList) do
+        for _, label in ipairs(allLabels) do
+            if string.find(string.upper(label.Text), rarity) then
+                local model = label:FindFirstAncestorOfClass("Model")
+                if model then
+                    local isSpawner = string.find(string.lower(model.Name), "spawner") or 
+                                      string.find(string.lower(model.Name), "pad")
+                    
+                    if not isSpawner then
+                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                        if hrp then return hrp end
                     end
                 end
             end
@@ -52,34 +48,31 @@ local function findActualBrainrot()
     return nil
 end
 
--- GUI (Cleaner Look)
+-- GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "YogiminiGodMode"
+gui.Name = "YogiminiUltra"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 220, 0, 90)
-frame.Position = UDim2.new(0.5, -110, 0.1, 0)
-frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-frame.Active = true
-frame.Draggable = true -- Damit du es auf dem Handy verschieben kannst
+frame.Size = UDim2.new(0, 200, 0, 80)
+frame.Position = UDim2.new(0.5, -100, 0.05, 0)
+frame.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
 Instance.new("UICorner", frame)
 
 local toggle = Instance.new("TextButton", frame)
-toggle.Size = UDim2.new(0, 200, 0, 70)
-toggle.Position = UDim2.new(0, 10, 0, 10)
-toggle.Text = "START FARM"
-toggle.BackgroundColor3 = Color3.fromRGB(85, 0, 255)
-toggle.TextColor3 = Color3.new(1,1,1)
+toggle.Size = UDim2.new(1, -10, 1, -10)
+toggle.Position = UDim2.new(0, 5, 0, 5)
+toggle.Text = "START GOD-FARM"
 toggle.TextScaled = true
+toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggle.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", toggle)
 
--- FARMING LOOP
 toggle.MouseButton1Click:Connect(function()
     farming = not farming
-    toggle.Text = farming and "STOPPING..." or "START FARM"
-    toggle.BackgroundColor3 = farming and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(85, 0, 255)
-    
+    toggle.Text = farming and "FARMING..." or "START GOD-FARM"
+    toggle.BackgroundColor3 = farming and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(30, 30, 30)
+
     if farming then
         task.spawn(function()
             while farming do
@@ -89,27 +82,24 @@ toggle.MouseButton1Click:Connect(function()
                 if myHrp then
                     if not basePos then basePos = myHrp.Position end
 
-                    local targetHrp = findActualBrainrot()
+                    local targetHrp = findBestBrainrot()
                     if targetHrp then
-                        toggle.Text = "FARMING..."
+                        -- TELEPORT MIT BLICKRICHTUNG
+                        -- Wir setzen dich 3 Studs vor das Objekt und lassen dich darauf schauen
+                        local offset = targetHrp.CFrame.LookVector * 3
+                        myHrp.CFrame = CFrame.new(targetHrp.Position + offset, targetHrp.Position)
                         
-                        -- Teleportiere zum Brainrot NPC
-                        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 3) -- 3 Studs davor landen
-                        
-                        task.wait(0.5)
+                        task.wait(0.4)
                         pressE()
                         task.wait(0.3)
                         
-                        -- Zurück zur Base
+                        -- ZURÜCK
                         myHrp.CFrame = CFrame.new(basePos)
-                        task.wait(0.7)
-                    else
-                        toggle.Text = "WAITING FOR SPAWN..."
+                        task.wait(0.8)
                     end
                 end
                 task.wait(0.5)
             end
-            toggle.Text = "START FARM"
         end)
     end
 end)
