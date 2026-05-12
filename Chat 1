@@ -1,138 +1,33 @@
---// SIMPLE DELTA MOBILE VERSION
+task.spawn(function()
 
-local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+    local busy = false
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
+    while farming do
 
--- BASE POSITION
-local basePos = hrp.Position
+        for _,pos in ipairs(brainrots) do
 
--- BRAINROT POSITIONS (ÄNDERN!)
-local brainrots = {
-    Vector3.new(100,10,100), -- Exclusive
-    Vector3.new(120,10,120), -- OG
-    Vector3.new(140,10,140), -- Divine
-    Vector3.new(160,10,160), -- Eternal
-    Vector3.new(180,10,180), -- Celestial
-    Vector3.new(200,10,200)  -- Admin
-}
+            if not farming then break end
 
-local farming = false
+            if busy then continue end
+            busy = true
 
--- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "BrainrotFarmGui"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+            -- teleport slightly above to avoid ground desync
+            hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
 
-local frame = Instance.new("Frame")
-frame.Parent = gui
-frame.Size = UDim2.new(0,220,0,140)
-frame.Position = UDim2.new(0.5,-110,0.5,-70)
-frame.BackgroundColor3 = Color3.fromRGB(35,35,35)
+            task.wait(0.15) -- fast stabilize
 
-local title = Instance.new("TextLabel")
-title.Parent = frame
-title.Size = UDim2.new(1,0,0,40)
-title.BackgroundTransparency = 1
-title.Text = "Brainrot Auto Farm"
-title.TextScaled = true
-title.TextColor3 = Color3.new(1,1,1)
+            -- instant E press
+            pressE()
 
-local toggle = Instance.new("TextButton")
-toggle.Parent = frame
-toggle.Size = UDim2.new(0,180,0,50)
-toggle.Position = UDim2.new(0,20,0,70)
-toggle.Text = "START FARM"
-toggle.TextScaled = true
-toggle.BackgroundColor3 = Color3.fromRGB(0,170,255)
-toggle.TextColor3 = Color3.new(1,1,1)
+            -- NO LONG WAIT HERE
+            task.wait(0.1)
 
--- DRAG
-local dragging = false
-local dragInput
-local dragStart
-local startPos
+            -- instant return
+            hrp.CFrame = CFrame.new(basePos)
 
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
+            task.wait(0.25) -- tiny buffer only
 
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- E PRESS
-local function pressE()
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.1)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-end
-
--- TOGGLE
-toggle.MouseButton1Click:Connect(function()
-
-    farming = not farming
-
-    if farming then
-        toggle.Text = "STOP FARM"
-
-        task.spawn(function()
-
-            while farming do
-
-                for _,pos in ipairs(brainrots) do
-
-                    if not farming then
-                        break
-                    end
-
-                    -- teleport
-                    hrp.CFrame = CFrame.new(pos)
-
-                    task.wait(1)
-
-                    -- press E
-                    pressE()
-
-                    task.wait(1)
-
-                    -- back to base
-                    hrp.CFrame = CFrame.new(basePos)
-
-                    task.wait(1.5)
-                end
-            end
-        end)
-
-    else
-        toggle.Text = "START FARM"
+            busy = false
+        end
     end
 end)
