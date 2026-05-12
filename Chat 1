@@ -1,82 +1,59 @@
---// YOGIMINI V11: THE SKY-ELIMINATOR (FINAL BOSS)
+--// YOGIMINI V12: ULTIMATE AUTO-COLLECT & ESCAPE
 
 local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Priorität der Seltenheiten
-local priority = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
+-- Seltenheiten (Beste zuerst)
+local rarities = {"ADMIN", "CELESTIAL", "ETERNAL", "DIVINE", "OG", "EXCLUSIVE", "GODLY", "SECRET"}
 
--- Funktion: Hard-Interaktion
-local function interact(target)
-    local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+-- Funktion: Das Brainrot wirklich EINSAMMELN (Remote Trigger)
+local function collect(targetModel)
+    -- Wir versuchen das RemoteEvent zu finden, das das Raw-Script nutzt
+    local event = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Collect") 
+                  or ReplicatedStorage:FindFirstChild("Pickup")
+    
+    if event then
+        event:FireServer(targetModel)
+    end
+    
+    -- Fallback: Simuliere ProximityPrompt (für alle Fälle)
+    local prompt = targetModel:FindFirstChildWhichIsA("ProximityPrompt", true)
     if prompt then
         fireproximityprompt(prompt)
-    else
-        for i = 1, 3 do
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.05)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end
     end
 end
 
--- Der ultimative Filter gegen Schilder und Tafeln
-local function isActualBrainrotNPC(obj)
-    if not obj:IsA("TextLabel") then return false end
-    
+-- Filter: Nur echte Brainrots (keine Schilder/Shop-Platten)
+local function isValidBrainrot(obj)
     local text = string.lower(obj.Text)
+    -- Filter Schilder (Bild 1000053036/1000053040)
+    if string.find(text, "spawn") or string.find(text, "in") or string.find(text, "time") then return false end
     
-    -- 1. FILTER: Ignoriere die Tafeln in der Luft (aus Bild 1000053036.jpg)
-    if string.find(text, "spawn") or string.find(text, "in") or string.find(text, "time") or string.find(text, "remaining") then
-        return false 
-    end
-
-    local model = obj:FindFirstAncestorOfClass("Model") or obj.Parent
+    local model = obj:FindFirstAncestorOfClass("Model")
     if model then
-        -- 2. FILTER: Robux/Shop Platten
-        for _, d in ipairs(model:GetDescendants()) do
-            if d:IsA("ImageLabel") and string.find(string.lower(d.Image), "rbx") then return false end
-            if d:IsA("TextLabel") and string.find(d.Text, "R%$") then return false end
-        end
-
-        -- 3. FILTER: Höhen-Check (Keine Ziele in der Luft)
-        local pos = model:GetPivot().Position
-        if pos.Y > 50 then return false end -- Wenn es höher als 50 Studs ist, ist es ein Schild
-
-        -- 4. CHECK: Muss wie ein NPC aussehen (hat ein Gesicht oder Körperteile)
-        if model:FindFirstChildWhichIsA("Humanoid") or model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("Decal", true) then
-            return true
+        -- Filter Shop-Platten
+        if model:FindFirstChild("ImageLabel", true) and string.find(string.lower(model:FindFirstChild("ImageLabel", true).Image), "rbx") then return false end
+        
+        -- Muss ein NPC/Objekt am Boden sein
+        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+        if hrp and hrp.Position.Y < 50 then
+            return model, hrp
         end
     end
-
-    return false
+    return nil
 end
 
-local function findTheRealOne()
-    local potentialTargets = {}
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("TextLabel") then
-            local t = string.upper(obj.Text)
-            for _, pName in ipairs(priority) do
-                if string.find(t, pName) then
-                    if isActualBrainrotNPC(obj) then
-                        local model = obj:FindFirstAncestorOfClass("Model") or obj.Parent
-                        table.insert(potentialTargets, {model = model, prio = pName})
-                    end
-                end
+-- Suche das beste Ziel
+local function getBestTarget()
+    for _, rarity in ipairs(rarities) do
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("TextLabel") and string.find(string.upper(obj.Text), rarity) then
+                local model, hrp = isValidBrainrot(obj)
+                if model then return model, hrp end
             end
-        end
-    end
-
-    -- Sortiere nach Priorität
-    for _, pName in ipairs(priority) do
-        for _, entry in ipairs(potentialTargets) do
-            if entry.prio == pName then return entry.model end
         end
     end
     return nil
@@ -86,22 +63,23 @@ end
 local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.ResetOnSpawn = false
 local btn = Instance.new("TextButton", gui)
-btn.Size = UDim2.new(0, 220, 0, 60)
-btn.Position = UDim2.new(0.5, -110, 0.1, 0)
-btn.Text = "V11: BRAINROT ONLY"
-btn.BackgroundColor3 = Color3.fromRGB(85, 0, 255)
-btn.TextColor3 = Color3.new(1,1,1)
+btn.Size = UDim2.new(0, 200, 0, 50)
+btn.Position = UDim2.new(0.5, -100, 0, 20)
+btn.Text = "ACTIVATE GOD-FARM"
+btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
 btn.TextScaled = true
 Instance.new("UICorner", btn)
 
 btn.MouseButton1Click:Connect(function()
     farming = not farming
-    btn.Text = farming and "FARMING..." or "START V11"
+    btn.Text = farming and "FARMING ON" or "ACTIVATE GOD-FARM"
+    btn.BackgroundColor3 = farming and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 150)
     
     if farming then
+        -- Setze Flucht-Punkt (Base)
         local char = player.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
-            basePos = char.HumanoidRootPart.Position
+            basePos = char.HumanoidRootPart.CFrame
         end
 
         task.spawn(function()
@@ -109,20 +87,23 @@ btn.MouseButton1Click:Connect(function()
                 local myChar = player.Character
                 local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
                 
-                if myHrp then
-                    local target = findTheRealOne()
-                    if target then
-                        local targetPos = target:GetPivot().Position
-                        -- Teleport zum NPC
-                        myHrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
+                if myHrp and basePos then
+                    local targetModel, targetHrp = getBestTarget()
+                    if targetHrp then
+                        -- 1. TELEPORT ZUM TARGET
+                        myHrp.CFrame = targetHrp.CFrame
+                        task.wait(0.2)
+                        
+                        -- 2. AUTO COLLECT
+                        collect(targetModel)
+                        task.wait(0.1)
+                        
+                        -- 3. AUTO ESCAPE (Sofort zurück zur Base)
+                        myHrp.CFrame = basePos
                         task.wait(0.5)
-                        interact(target)
-                        task.wait(0.3)
-                        -- Zurück nach Hause
-                        myHrp.CFrame = CFrame.new(basePos)
                     end
                 end
-                task.wait(1.2)
+                task.wait(0.5)
             end
         end)
     end
