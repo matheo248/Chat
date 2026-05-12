@@ -1,4 +1,4 @@
---// YOGIMINI BRAINROT REPAIR-V2 (No-Button-Edition)
+--// YOGIMINI BRAINROT REPAIR-V3 (The Button-Killer)
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -7,31 +7,40 @@ local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
+-- Liste der Seltenheiten
 local targetNames = {"Exclusive", "OG", "Divine", "Eternal", "Celestial", "Admin"}
 
--- Funktion zum Drücken der E-Taste
-local function pressE()
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.2)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+-- Funktion zum E-Drücken (via ProximityPrompt, falls vorhanden)
+local function interact(target)
+    local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        fireproximityprompt(prompt) -- Direktes Auslösen (geht schneller)
+    else
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end
 end
 
--- VERBESSERTE SUCHE: Ignoriert Shop-Knöpfe
-local function findTarget(namePart)
+-- NEUE SUCHE: Sucht nur nach beweglichen Objekten, nicht nach festen Bodenplatten
+local function findRealBrainrot(namePart)
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- Prüfe, ob der Name passt UND es kein UI-Knopf ist
-        if (obj:IsA("BasePart") or obj:IsA("Model")) and string.find(obj.Name, namePart) then
+        -- Es muss den Namen enthalten
+        if string.find(obj.Name, namePart) then
+            -- CHECK: Ist es eine Bodenplatte? (Anhand deines Bildes 1000053014.jpg)
+            -- Echte Brainrots sind meistens Models oder Parts, die NICHT flach auf dem Boden liegen wie die Buttons
+            local isPlate = false
+            if obj:IsA("BasePart") and obj.Size.Y < 1 then isPlate = true end
             
-            -- CHECK: Ist es ein Kauf-Button? (Ignoriere Objekte mit "Button" oder "Purchase" im Namen/Parent)
-            local isButton = false
-            if string.find(string.lower(obj.Name), "button") or 
-               string.find(string.lower(obj.Name), "buy") or 
-               obj:FindFirstChildWhichIsA("BillboardGui") then
-                isButton = true
+            -- CHECK: Hat es ein Robux-Zeichen oder Text drüber? (Shop-Indikator)
+            if obj:FindFirstChild("BillboardGui") or obj:FindFirstChild("SurfaceGui") then
+                -- Wir ignorieren es, wenn es wie ein Shop-Button aussieht
+                if not obj:FindFirstChildWhichIsA("ProximityPrompt", true) then
+                    isPlate = true
+                end
             end
 
-            if not isButton then
-                -- Wenn es ein Model ist, nimm das Hauptteil, sonst das Part selbst
+            if not isPlate then
                 return obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
             end
         end
@@ -39,23 +48,22 @@ local function findTarget(namePart)
     return nil
 end
 
--- GUI (Gleiches Design wie vorhin)
+-- GUI (Bleibt gleich, weil sie ja gut funktioniert)
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "YogiminiFarmV2"
+gui.Name = "YogiminiFinal"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 200, 0, 100)
-frame.Position = UDim2.new(0.5, -100, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.Position = UDim2.new(0.5, -100, 0.1, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Instance.new("UICorner", frame)
 
 local toggle = Instance.new("TextButton", frame)
 toggle.Size = UDim2.new(0, 160, 0, 40)
 toggle.Position = UDim2.new(0.5, -80, 0.5, -20)
 toggle.Text = "START FARM"
-toggle.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-toggle.TextColor3 = Color3.new(1,1,1)
+toggle.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
 toggle.TextScaled = true
 Instance.new("UICorner", toggle)
 
@@ -63,8 +71,7 @@ Instance.new("UICorner", toggle)
 toggle.MouseButton1Click:Connect(function()
     farming = not farming
     toggle.Text = farming and "STOP FARM" or "START FARM"
-    toggle.BackgroundColor3 = farming and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 150, 255)
-
+    
     if farming then
         task.spawn(function()
             while farming do
@@ -77,18 +84,18 @@ toggle.MouseButton1Click:Connect(function()
                     for _, name in ipairs(targetNames) do
                         if not farming then break end
                         
-                        local target = findTarget(name)
+                        local target = findRealBrainrot(name)
                         if target then
-                            -- Teleportiere direkt zum Objekt
-                            hrp.CFrame = target.CFrame * CFrame.new(0, 2, 0) 
-                            task.wait(0.5)
-                            
-                            pressE()
+                            -- Teleport zum echten Brainrot
+                            hrp.CFrame = target.CFrame * CFrame.new(0, 3, 0)
                             task.wait(0.3)
                             
-                            -- Sofort zurück nach Hause
+                            interact(target)
+                            task.wait(0.3)
+                            
+                            -- Sofort zurück zur Home-Base
                             hrp.CFrame = CFrame.new(basePos)
-                            task.wait(0.7) -- Kurze Pause vor dem nächsten Check
+                            task.wait(0.5)
                         end
                     end
                 end
