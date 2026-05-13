@@ -1,0 +1,128 @@
+--[[
+    YOGIMINI VERSION 2.4
+    FINAL PROTECTION: THE IRON CURTAIN (ANTI-BASE SHIELD)
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Yogimini V2.4 | Final Protection",
+   LoadingTitle = "Iron Curtain Active",
+   LoadingSubtitle = "by Gemini",
+   ConfigurationSaving = {Enabled = false},
+   KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local farming = false
+local basePos = nil
+
+local selectedRarities = {
+    ["ADMIN"] = false, ["ETERNAL"] = false, ["OG"] = false, 
+    ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
+}
+
+-- // TARGET LOGIK MIT EISERNEM VORHANG //
+local function getTarget()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            local text = obj.Text:upper()
+            for rarity, enabled in pairs(selectedRarities) do
+                if enabled and string.find(text, rarity) then
+                    
+                    -- Filter gegen Shop/Schilder
+                    if string.find(text:lower(), "spawn") or string.find(text:lower(), "only") then continue end
+                    
+                    local model = obj:FindFirstAncestorOfClass("Model")
+                    if model and not Players:GetPlayerFromCharacter(model) then
+                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                        
+                        if hrp then
+                            -- 1. HARD RADIUS CHECK (200 Studs - Absolute Mitte)
+                            local dist = (hrp.Position * Vector3.new(1,0,1)).Magnitude
+                            if dist > 200 then continue end 
+                            
+                            -- 2. ANTI-BASE-PARTS CHECK
+                            -- Wir schauen, ob das Ziel in der Nähe von Base-Strukturen ist
+                            local isNearBase = false
+                            local nearby = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5,5,5), hrp.Position + Vector3.new(5,5,5)), nil, 20)
+                            for _, part in ipairs(nearby) do
+                                local pName = part.Name:lower()
+                                if pName:find("wall") or pName:find("floor") or pName:find("plot") or pName:find("base") then
+                                    isNearBase = true
+                                    break
+                                end
+                            end
+                            
+                            if isNearBase then continue end
+                            if hrp.Size.Y < 1.3 then continue end -- Knopf-Schutz
+
+                            return model, hrp
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- // UI //
+local FarmTab = Window:CreateTab("Automation", 4483362458)
+
+FarmTab:CreateToggle({
+   Name = "START AUTO-FARM",
+   CurrentValue = false,
+   Flag = "MasterToggle",
+   Callback = function(Value)
+      farming = Value
+      if farming then
+          if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+              basePos = player.Character.HumanoidRootPart.CFrame
+          end
+          
+          task.spawn(function()
+              while farming do
+                  local target, hrp = getTarget()
+                  if hrp and farming then
+                      -- 1. TP ZUM NPC
+                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -2.5)
+                      task.wait(0.35)
+                      
+                      -- 2. INTERAKTION (E hämmern)
+                      local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+                      local endTime = tick() + 0.8
+                      while tick() < endTime and farming do
+                          if prompt then fireproximityprompt(prompt) end
+                          game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                          task.wait(0.1)
+                          game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                      end
+                      
+                      -- 3. SOFORTIGER RÜCKFLUG
+                      task.wait(0.1)
+                      if basePos then
+                          player.Character.HumanoidRootPart.CFrame = basePos
+                      end
+                      task.wait(1.0)
+                  end
+                  task.wait(0.1)
+              end
+          end)
+      end
+   end,
+})
+
+-- Toggles
+local list = {"GODLY", "CELESTIAL", "DIVINE", "ADMIN", "EXCLUSIVE", "ETERNAL", "OG"}
+for _, r in ipairs(list) do
+    FarmTab:CreateToggle({
+       Name = "Collect " .. r,
+       CurrentValue = false,
+       Callback = function(Value) selectedRarities[r] = Value end,
+    })
+end
+
+Rayfield:Notify({Title = "V2.4 Final", Content = "Iron Curtain aktiv. Keine Base-Teleports mehr!", Duration = 5})
