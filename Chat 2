@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 1.6
-    Challenge 3: ANTI-PLAYER-TP & HARD-RADIUS
+    YOGIMINI VERSION 1.7
+    Challenge 3: HOLD-LOGIK & BASE-RETURN FIX
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V1.6 | Anti-Player",
-   LoadingTitle = "Humanoid-Filter Active",
+   Name = "Yogimini V1.7 | Hold & Return",
+   LoadingTitle = "Improved Pickup Engine",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
@@ -24,35 +24,35 @@ local selectedRarities = {
     ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
 }
 
--- // DER SPIELER-STOPPER //
+-- // LOGIK: PRÜFEN OB WIR ETWAS IN DER HAND HALTEN //
+local function isHoldingAnything()
+    local char = player.Character
+    if char then
+        -- Wir schauen ob ein Tool oder ein Model an den Charakter geschweißt wurde
+        for _, child in ipairs(char:GetChildren()) do
+            if child:IsA("Tool") or (child:IsA("Model") and child.Name ~= char.Name) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function getTarget()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
             local labelText = obj.Text:upper()
-            
             for rarity, enabled in pairs(selectedRarities) do
                 if enabled and string.find(labelText, rarity) then
-                    
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model then
-                        -- 1. SICHERHEIT: Ist es ein echter Spieler? (Character Check)
-                        -- Wir prüfen, ob das Modell im "Players" Service existiert
+                        -- SICHERHEIT: Kein Spieler, keine Base, kein Knopf
                         if Players:GetPlayerFromCharacter(model) then continue end
-                        
-                        -- 2. SICHERHEIT: Hat das Modell einen Namen wie ein Spieler?
-                        if Players:FindFirstChild(model.Name) then continue end
-
                         local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
                         if hrp then
-                            -- 3. SICHERHEIT: Distanz-Check (Nur öffentliche Zone)
-                            -- Alles über 250m ist tabu!
-                            local dist = (hrp.Position * Vector3.new(1,0,1)).Magnitude
-                            if dist > 250 then continue end 
-                            
-                            -- 4. SICHERHEIT: Keine Knöpfe/Schilder
+                            -- Radius-Check (Sicherheitszone 250m)
+                            if (hrp.Position * Vector3.new(1,0,1)).Magnitude > 250 then continue end
                             if hrp.Size.Y < 1.3 then continue end
-                            if string.find(obj.Text:lower(), "spawn") then continue end
-
                             return model, hrp
                         end
                     end
@@ -80,24 +80,29 @@ FarmTab:CreateToggle({
               while farming do
                   local target, hrp = getTarget()
                   if hrp and farming then
-                      -- Blitz-TP
+                      -- 1. TP ZUM BRAINROT
                       player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
-                      task.wait(0.35)
+                      task.wait(0.4) -- Zeit zum "Ankommen"
                       
-                      -- Collect (3x für Godly-Sicherheit)
+                      -- 2. PICKUP VERSUCH (Mehrfach E drücken)
                       local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
-                      for i = 1, 3 do
+                      local attempts = 0
+                      
+                      while farming and attempts < 5 and not isHoldingAnything() do
                           if remote then remote:FireServer(target) end
                           game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                          task.wait(0.05)
+                          task.wait(0.1)
                           game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                          attempts = attempts + 1
+                          task.wait(0.2) -- Kurze Pause zwischen den Versuchen
                       end
                       
-                      task.wait(0.15)
-                      -- Sofort-Rückzug
+                      -- 3. WENN ERFOLGREICH ODER TIMEOUT -> ZURÜCK ZUR BASE
+                      task.wait(0.1)
                       player.Character.HumanoidRootPart.CFrame = basePos
+                      task.wait(1) -- Warten bis wir sicher in der Base gelandet sind
                   end
-                  task.wait(1.2)
+                  task.wait(0.5)
               end
           end)
       end
@@ -113,4 +118,4 @@ for rarity, _ in pairs(selectedRarities) do
     })
 end
 
-Rayfield:Notify({Title = "V1.6 Geladen", Content = "Spieler-Filter & 250m-Limit aktiv.", Duration = 5})
+Rayfield:Notify({Title = "V1.7 Aktiv", Content = "Pickup-Check & Return-Engine bereit.", Duration = 5})
