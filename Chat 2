@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 1.9
-    BRUTE-FORCE PICKUP & AUTO-RETURN
+    YOGIMINI VERSION 2.0
+    FINAL CHALLENGE 3 FIX: ENGINE-LEVEL TRIGGERING
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V1.9 | Brute-Force",
-   LoadingTitle = "Fixing Pickup...",
+   Name = "Yogimini V2.0 | Final Fix",
+   LoadingTitle = "Engine-Level Farm",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
@@ -24,20 +24,17 @@ local selectedRarities = {
     ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
 }
 
--- FUNKTION: Target finden (Die stabile Version)
+-- FUNKTION: Das Ziel finden (Stabilisiert)
 local function getTarget()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
-            local labelText = obj.Text:upper()
+            local text = obj.Text:upper()
             for rarity, enabled in pairs(selectedRarities) do
-                if enabled and string.find(labelText, rarity) then
+                if enabled and string.find(text, rarity) then
                     local model = obj:FindFirstAncestorOfClass("Model")
-                    if model then
-                        if Players:GetPlayerFromCharacter(model) then continue end
+                    if model and not Players:GetPlayerFromCharacter(model) then
                         local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                        if hrp then
-                            -- Sicherheitscheck gegen Basen
-                            if (hrp.Position * Vector3.new(1,0,1)).Magnitude > 300 then continue end
+                        if hrp and (hrp.Position * Vector3.new(1,0,1)).Magnitude < 300 then
                             return model, hrp
                         end
                     end
@@ -58,7 +55,6 @@ FarmTab:CreateToggle({
    Callback = function(Value)
       farming = Value
       if farming then
-          -- Speichere die Position beim Starten
           if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
               basePos = player.Character.HumanoidRootPart.CFrame
           end
@@ -67,39 +63,41 @@ FarmTab:CreateToggle({
               while farming do
                   local target, hrp = getTarget()
                   if hrp and farming then
-                      -- 1. SCHNELLER TELEPORT
-                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 2, 0)
-                      task.wait(0.3)
+                      -- 1. PRÄZISER TELEPORT (Direkt vor das ProximityPrompt)
+                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -2)
+                      task.wait(0.25)
                       
-                      -- 2. AGGRESSIVES PICKUP (0.8 Sekunden lang E spammen)
+                      -- 2. ENGINE-LEVEL INTERACTION (Referenz: RemoteEvent & LocalScript)
+                      local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
                       local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
-                      local endTime = tick() + 0.8
                       
-                      while tick() < endTime do
-                          if remote then remote:FireServer(target) end
-                          -- ProximityPrompt direkt feuern für maximale Geschwindigkeit
-                          local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                          if prompt then fireproximityprompt(prompt) end
-                          
-                          game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                          task.wait(0.05)
-                          game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                          task.wait(0.05)
+                      -- Wir triggern den Prompt direkt in der Engine
+                      if prompt then
+                          task.spawn(function()
+                              fireproximityprompt(prompt) -- Simuliert das Halten von 'E' sofort
+                          end)
                       end
                       
-                      -- 3. ZWANGS-TELEPORT ZURÜCK
-                      task.wait(0.1)
+                      -- Wir senden das Remote-Signal zur Sicherheit (Referenz: RemoteEvent)
+                      if remote and remote:IsA("RemoteEvent") then
+                          remote:FireServer(target)
+                      end
+
+                      -- Kurzes Warten für die Animation (0.5s sind bei Godly nötig)
+                      task.wait(0.5)
+                      
+                      -- 3. ZWANGS-RÜCKKEHR
                       player.Character.HumanoidRootPart.CFrame = basePos
-                      task.wait(0.8) -- Kurze Pause in der Base zum Sellen/Ablegen
+                      task.wait(0.7) -- Zeit zum Ablegen in der eigenen Base
                   end
-                  task.wait(0.2)
+                  task.wait(0.1)
               end
           end)
       end
    end,
 })
 
--- Toggles
+-- Rarity Toggles
 local list = {"GODLY", "CELESTIAL", "DIVINE", "ADMIN", "EXCLUSIVE", "ETERNAL", "OG"}
 for _, r in ipairs(list) do
     FarmTab:CreateToggle({
