@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 1.7
-    Challenge 3: HOLD-LOGIK & BASE-RETURN FIX
+    YOGIMINI VERSION 1.8
+    STRICT REPAIR: FIXED TARGETING & HOLD-LOGIC
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V1.7 | Hold & Return",
-   LoadingTitle = "Improved Pickup Engine",
+   Name = "Yogimini V1.8 | Fixed",
+   LoadingTitle = "Back to Basics",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
@@ -24,35 +24,37 @@ local selectedRarities = {
     ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
 }
 
--- // LOGIK: PRÜFEN OB WIR ETWAS IN DER HAND HALTEN //
-local function isHoldingAnything()
+-- FUNKTION: Prüfen ob wir das Teil wirklich halten
+local function isHoldingBrainrot()
     local char = player.Character
     if char then
-        -- Wir schauen ob ein Tool oder ein Model an den Charakter geschweißt wurde
-        for _, child in ipairs(char:GetChildren()) do
-            if child:IsA("Tool") or (child:IsA("Model") and child.Name ~= char.Name) then
-                return true
-            end
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Model") and v.Name ~= char.Name then return true end
+            if v:IsA("Tool") then return true end
         end
     end
     return false
 end
 
+-- DIE LOGIK DIE FUNKTIONIERT HAT (V20/V1.5 Mix)
 local function getTarget()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
             local labelText = obj.Text:upper()
             for rarity, enabled in pairs(selectedRarities) do
                 if enabled and string.find(labelText, rarity) then
+                    
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model then
-                        -- SICHERHEIT: Kein Spieler, keine Base, kein Knopf
+                        -- Hard Filter gegen Spieler und Basen
                         if Players:GetPlayerFromCharacter(model) then continue end
+                        
                         local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
                         if hrp then
-                            -- Radius-Check (Sicherheitszone 250m)
+                            -- RADIKALER RADIUS-CHECK (Nur Mitte!)
                             if (hrp.Position * Vector3.new(1,0,1)).Magnitude > 250 then continue end
-                            if hrp.Size.Y < 1.3 then continue end
+                            if hrp.Size.Y < 1.3 then continue end -- Keine Bodenplatten
+                            
                             return model, hrp
                         end
                     end
@@ -73,34 +75,32 @@ FarmTab:CreateToggle({
    Callback = function(Value)
       farming = Value
       if farming then
-          if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-              basePos = player.Character.HumanoidRootPart.CFrame
-          end
+          basePos = player.Character.HumanoidRootPart.CFrame
           task.spawn(function()
               while farming do
                   local target, hrp = getTarget()
                   if hrp and farming then
-                      -- 1. TP ZUM BRAINROT
+                      -- 1. TELEPORT ZUM NPC
                       player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
-                      task.wait(0.4) -- Zeit zum "Ankommen"
+                      task.wait(0.4)
                       
-                      -- 2. PICKUP VERSUCH (Mehrfach E drücken)
+                      -- 2. AUFHEBEN (Warten bis es in der Hand ist)
                       local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
-                      local attempts = 0
+                      local t = tick()
                       
-                      while farming and attempts < 5 and not isHoldingAnything() do
+                      -- Er versucht 2 Sekunden lang zu pickuppen
+                      while farming and (tick() - t) < 2 and not isHoldingBrainrot() do
                           if remote then remote:FireServer(target) end
                           game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
                           task.wait(0.1)
                           game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                          attempts = attempts + 1
-                          task.wait(0.2) -- Kurze Pause zwischen den Versuchen
+                          task.wait(0.2)
                       end
                       
-                      -- 3. WENN ERFOLGREICH ODER TIMEOUT -> ZURÜCK ZUR BASE
-                      task.wait(0.1)
+                      -- 3. ZURÜCK ZUR BASE (Nur wenn Zeit um oder Item da)
+                      task.wait(0.2)
                       player.Character.HumanoidRootPart.CFrame = basePos
-                      task.wait(1) -- Warten bis wir sicher in der Base gelandet sind
+                      task.wait(1)
                   end
                   task.wait(0.5)
               end
@@ -109,7 +109,6 @@ FarmTab:CreateToggle({
    end,
 })
 
--- Toggles
 for rarity, _ in pairs(selectedRarities) do
     FarmTab:CreateToggle({
        Name = "Collect " .. rarity,
@@ -117,5 +116,3 @@ for rarity, _ in pairs(selectedRarities) do
        Callback = function(Value) selectedRarities[rarity] = Value end,
     })
 end
-
-Rayfield:Notify({Title = "V1.7 Aktiv", Content = "Pickup-Check & Return-Engine bereit.", Duration = 5})
