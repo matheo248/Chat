@@ -1,19 +1,18 @@
 --[[
-    YOGIMINI VERSION 1.3
-    Challenge 3 Final Fix: Deep-Scan Engine & Reliable TP
+    YOGIMINI VERSION 1.4
+    Challenge 3: NO-BUTTONS EDITION (Hard-Filter)
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V1.3 | Fixed",
-   LoadingTitle = "Ultimate Search Engine",
+   Name = "Yogimini V1.4 | Anti-Button",
+   LoadingTitle = "Filtering Buttons...",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
 })
 
--- Variablen
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -30,34 +29,40 @@ local selectedRarities = {
     ["GODLY"] = false
 }
 
--- // DIE NEUE DEEP-SCAN ENGINE //
+-- // DIE LOGIK DIE KNÖPFE HASST //
 local function getTarget()
-    -- Wir gehen durch alle Modelle im Workspace
-    for _, model in ipairs(workspace:GetDescendants()) do
-        -- Wir suchen nach JEDEM Text, egal wo er sich versteckt
-        if model:IsA("TextLabel") or model:IsA("TextBox") then
-            local labelText = model.Text:upper()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            local labelText = obj.Text:upper()
             
             for rarity, enabled in pairs(selectedRarities) do
                 if enabled and string.find(labelText, rarity) then
                     
-                    -- Filter gegen Shop/Spawn (wie auf Bild 1000053067.jpg zu sehen)
-                    if string.find(labelText:lower(), "spawn") or string.find(labelText:lower(), "only") then continue end
+                    -- 1. SCHILDER/SHOP FILTER
+                    local lowText = obj.Text:lower()
+                    if string.find(lowText, "spawn") or string.find(lowText, "only") or string.find(lowText, "in ") then continue end
                     
-                    -- Finde den physischen Teil zum Teleportieren
-                    local parentModel = model:FindFirstAncestorOfClass("Model")
-                    if parentModel then
-                        local hrp = parentModel:FindFirstChild("HumanoidRootPart") or parentModel.PrimaryPart or parentModel:FindFirstChildWhichIsA("BasePart")
+                    local model = obj:FindFirstAncestorOfClass("Model")
+                    if model then
+                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
                         
                         if hrp then
-                            -- ANTI-PLAYER & ANTI-BASE CHECK
-                            if Players:GetPlayerFromCharacter(parentModel) then continue end
+                            -- 2. ANTI-KNOPF-CHECK (Sehr wichtig!)
+                            -- Die Knöpfe auf deinen Bildern sind meistens flache Teile (Y-Achse sehr klein)
+                            -- Echte Brainrot-NPCs sind viel dicker/höher.
+                            if hrp.Size.Y < 1.2 then continue end -- Ignoriert flache Platten
                             
-                            -- Distanz-Check: Nur wenn nicht zu weit weg vom Zentrum
+                            -- 3. ANTI-BASE CHECK (Radius)
                             local mag = (hrp.Position * Vector3.new(1,0,1)).Magnitude
-                            if mag > 500 then continue end 
+                            if mag > 450 then continue end 
+                            
+                            -- 4. KEINE SPIELER
+                            if Players:GetPlayerFromCharacter(model) then continue end
+                            
+                            -- 5. BUTTON-NAMEN FILTER
+                            if string.find(model.Name:lower(), "button") or string.find(model.Name:lower(), "pad") then continue end
 
-                            return parentModel, hrp
+                            return model, hrp
                         end
                     end
                 end
@@ -67,10 +72,9 @@ local function getTarget()
     return nil
 end
 
--- // UI TABS //
+-- // UI //
 local FarmTab = Window:CreateTab("Automation", 4483362458)
 
-FarmTab:CreateSection("Main Switch")
 FarmTab:CreateToggle({
    Name = "START AUTO-FARM",
    CurrentValue = false,
@@ -80,50 +84,39 @@ FarmTab:CreateToggle({
       if farming then
           if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
               basePos = player.Character.HumanoidRootPart.CFrame
-              Rayfield:Notify({Title = "Suche...", Content = "Scanne Map nach Zielen", Duration = 2})
           end
-
           task.spawn(function()
               while farming do
                   local target, hrp = getTarget()
-                  
                   if hrp and farming then
-                      -- TP direkt auf das Objekt
-                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
+                      -- Teleport 4 Studs drüber
+                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 4, 0)
                       task.wait(0.3)
                       
-                      -- Remote & E-Tasten Mix für 100% Erfolg
+                      -- Remote-Signal
                       local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
-                      if remote and remote:IsA("RemoteEvent") then
-                          remote:FireServer(target)
-                      end
+                      if remote and remote:IsA("RemoteEvent") then remote:FireServer(target) end
                       
-                      -- Simuliere E drücken
+                      -- E-Taste
                       game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
                       task.wait(0.1)
                       game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
                       
                       task.wait(0.2)
-                      -- Zurück zur Base
                       player.Character.HumanoidRootPart.CFrame = basePos
                   end
-                  task.wait(1)
+                  task.wait(1.2)
               end
           end)
       end
    end,
 })
 
-FarmTab:CreateSection("Raritäten")
 local rarityList = {"ADMIN", "ETERNAL", "OG", "DIVINE", "CELESTIAL", "EXCLUSIVE", "GODLY"}
 for _, rarity in ipairs(rarityList) do
     FarmTab:CreateToggle({
        Name = "Collect " .. rarity,
        CurrentValue = false,
-       Callback = function(Value)
-          selectedRarities[rarity] = Value
-       end,
+       Callback = function(Value) selectedRarities[rarity] = Value end,
     })
 end
-
-Rayfield:Notify({Title = "V1.3 Geladen", Content = "Engine bereit!", Duration = 5})
