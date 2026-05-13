@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 1
-    Challenge 2: Rayfield UI Integration (Clean Name Edition)
+    YOGIMINI VERSION 1.1
+    Challenge 3: Seltenheits-Filter & Anti-Base-Hardlock
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini Version 1 | Challenge 2",
-   LoadingTitle = "Ghost-Ray System",
+   Name = "Yogimini V1.1 | Challenge 3",
+   LoadingTitle = "Advanced Rarity System",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {
       Enabled = true,
@@ -17,41 +17,52 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Variablen für die Logik
+-- Variablen
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
-local rarities = {"Admin", "Eternal", "OG", "Divine", "Celestial", "Exclusive", "Godly"}
+
+-- Filter-Einstellungen (Standard alles aus)
+local selectedRarities = {
+    ["ADMIN"] = false,
+    ["ETERNAL"] = false,
+    ["OG"] = false,
+    ["DIVINE"] = false,
+    ["CELESTIAL"] = false,
+    ["EXCLUSIVE"] = false,
+    ["GODLY"] = false,
+    ["SECRET"] = false
+}
 
 -- // LOGIK-FUNKTIONEN //
 
-local function isInsideAnyPlayerBase(position)
-    local checkRadius = 15
-    local parts = workspace:FindPartsInRegion3(Region3.new(position - Vector3.new(checkRadius, 10, checkRadius), position + Vector3.new(checkRadius, 20, checkRadius)), nil, 100)
-    for _, part in ipairs(parts) do
-        local name = part.Name:lower()
-        local parentName = part.Parent.Name:lower()
-        if string.find(name, "base") or string.find(name, "plot") or string.find(parentName, "base") or string.find(parentName, "plot") then
-            return true
-        end
-    end
-    return false
-end
-
 local function getTarget()
-    for _, rarity in ipairs(rarities) do
+    for rarity, enabled in pairs(selectedRarities) do
+        if not enabled then continue end
+        
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("TextLabel") and string.find(obj.Text:upper(), rarity:upper()) then
+            if obj:IsA("TextLabel") and string.find(obj.Text:upper(), rarity) then
+                -- Filter gegen Schilder (Bild 1000053036.jpg)
                 if string.find(obj.Text:lower(), "spawn") or string.find(obj.Text:lower(), "in ") then continue end
+                
                 local model = obj:FindFirstAncestorOfClass("Model")
                 if model then
                     local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
                     if hrp then
-                        if isInsideAnyPlayerBase(hrp.Position) then continue end
+                        -- 1. HARD-RADIUS FIX: Nur in der Mitte der Map (Radius 350 Studs)
+                        -- Basen liegen meist bei 500+ Studs Entfernung
+                        local distanceFromCenter = (hrp.Position * Vector3.new(1,0,1)).Magnitude
+                        if distanceFromCenter > 350 then continue end
+
+                        -- 2. PLAYER CHECK
                         if Players:GetPlayerFromCharacter(model) then continue end
-                        if hrp.Size.Y < 1.5 then continue end
+                        
+                        -- 3. BASE-NAME CHECK (Zusatzsicherung)
+                        local fullName = model:GetFullName():lower()
+                        if string.find(fullName, "base") or string.find(fullName, "plot") then continue end
+
                         return model, hrp
                     end
                 end
@@ -63,22 +74,17 @@ end
 
 -- // UI TABS //
 
-local MainTab = Window:CreateTab("Automation", 4483362458)
+local FarmTab = Window:CreateTab("Farm Settings", 4483362458)
 
-local Section = MainTab:CreateSection("Main Farm")
-
-local Toggle = MainTab:CreateToggle({
-   Name = "Auto-Farm (Ghost Mode)",
+FarmTab:CreateSection("Master Control")
+FarmTab:CreateToggle({
+   Name = "AUTO-FARM START",
    CurrentValue = false,
-   Flag = "FarmToggle",
+   Flag = "MasterToggle",
    Callback = function(Value)
       farming = Value
       if farming then
-          if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-              basePos = player.Character.HumanoidRootPart.CFrame
-              Rayfield:Notify({Title = "Farm Aktiviert", Content = "Version 1 läuft sicher im Ghost-Mode.", Duration = 3})
-          end
-          
+          basePos = player.Character.HumanoidRootPart.CFrame
           task.spawn(function()
               while farming do
                   local target, hrp = getTarget()
@@ -92,32 +98,40 @@ local Toggle = MainTab:CreateToggle({
                       end
                       
                       game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                      task.wait(0.05)
+                      task.wait(0.1)
                       game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
                       
                       task.wait(0.2)
                       player.Character.HumanoidRootPart.CFrame = basePos
                   end
-                  task.wait(1.5)
+                  task.wait(1.2)
               end
           end)
-      else
-          Rayfield:Notify({Title = "Farm Pausiert", Content = "System im Standby.", Duration = 3})
       end
    end,
 })
 
-local SettingsTab = Window:CreateTab("Settings", 4483362458)
-SettingsTab:CreateButton({
+FarmTab:CreateSection("Rarity Selection")
+
+-- Erstelle Toggles für jede Seltenheit
+for rarity, _ in pairs(selectedRarities) do
+    FarmTab:CreateToggle({
+       Name = "Collect " .. rarity,
+       CurrentValue = false,
+       Callback = function(Value)
+          selectedRarities[rarity] = Value
+       end,
+    })
+end
+
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+MiscTab:CreateButton({
    Name = "Destroy UI",
-   Callback = function()
-      Rayfield:Destroy()
-   end,
+   Callback = function() Rayfield:Destroy() end,
 })
 
 Rayfield:Notify({
-   Title = "Yogimini V1",
-   Content = "Bereit für den Einsatz.",
-   Duration = 5,
-   Image = 4483362458,
+   Title = "Yogimini V1.1",
+   Content = "Wähle deine Seltenheiten aus und starte den Farm!",
+   Duration = 5
 })
