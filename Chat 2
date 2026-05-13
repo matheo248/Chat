@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 2.0
-    FINAL CHALLENGE 3 FIX: ENGINE-LEVEL TRIGGERING
+    YOGIMINI VERSION 2.1
+    STRICT REPAIR: NO MORE BUTTONS - ONLY BRAINROTS
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V2.0 | Final Fix",
-   LoadingTitle = "Engine-Level Farm",
+   Name = "Yogimini V2.1 | Final Fix",
+   LoadingTitle = "Filtering Buttons...",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
@@ -24,17 +24,34 @@ local selectedRarities = {
     ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
 }
 
--- FUNKTION: Das Ziel finden (Stabilisiert)
+-- // DIE LOGIK DIE KNÖPFE HASST //
 local function getTarget()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
             local text = obj.Text:upper()
             for rarity, enabled in pairs(selectedRarities) do
                 if enabled and string.find(text, rarity) then
+                    
+                    -- FILTER 1: SCHILDER & SPAWN (Bild 1000053071.jpg)
+                    if string.find(text:lower(), "spawn") or string.find(text:lower(), "only") then continue end
+                    
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model and not Players:GetPlayerFromCharacter(model) then
-                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                        if hrp and (hrp.Position * Vector3.new(1,0,1)).Magnitude < 300 then
+                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                        
+                        if hrp then
+                            -- FILTER 2: DER KNOPF-KILLER (Physik-Check)
+                            -- Echte Brainrots sind NPCs. Knöpfe sind flache Teile am Boden.
+                            -- Wenn das Teil flach ist (Y < 1.2) oder "Button" heißt -> IGNORIEREN
+                            if hrp.Size.Y < 1.3 or string.find(model.Name:lower(), "button") or string.find(model.Name:lower(), "pad") then 
+                                continue 
+                            end
+
+                            -- FILTER 3: RADIUS-CHECK (Max 250m vom Zentrum)
+                            -- Das hält dich fern von den Spieler-Basen am Rand
+                            local dist = (hrp.Position * Vector3.new(1,0,1)).Magnitude
+                            if dist > 250 then continue end
+
                             return model, hrp
                         end
                     end
@@ -63,32 +80,32 @@ FarmTab:CreateToggle({
               while farming do
                   local target, hrp = getTarget()
                   if hrp and farming then
-                      -- 1. PRÄZISER TELEPORT (Direkt vor das ProximityPrompt)
+                      -- 1. TELEPORT ZUM NPC (Mit kleinem Abstand)
                       player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -2)
-                      task.wait(0.25)
+                      task.wait(0.3)
                       
-                      -- 2. ENGINE-LEVEL INTERACTION (Referenz: RemoteEvent & LocalScript)
+                      -- 2. PICKUP (Aggressiv)
                       local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                      local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
-                      
-                      -- Wir triggern den Prompt direkt in der Engine
                       if prompt then
-                          task.spawn(function()
-                              fireproximityprompt(prompt) -- Simuliert das Halten von 'E' sofort
-                          end)
+                          fireproximityprompt(prompt)
                       end
                       
-                      -- Wir senden das Remote-Signal zur Sicherheit (Referenz: RemoteEvent)
-                      if remote and remote:IsA("RemoteEvent") then
-                          remote:FireServer(target)
+                      -- Remote Signal als Backup
+                      local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
+                      if remote then remote:FireServer(target) end
+                      
+                      -- E-Taste hämmern
+                      for i = 1, 5 do
+                          game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                          task.wait(0.05)
+                          game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
                       end
 
-                      -- Kurzes Warten für die Animation (0.5s sind bei Godly nötig)
-                      task.wait(0.5)
+                      task.wait(0.4) -- Zeit für die Animation
                       
-                      -- 3. ZWANGS-RÜCKKEHR
+                      -- 3. ZURÜCK ZUR BASE
                       player.Character.HumanoidRootPart.CFrame = basePos
-                      task.wait(0.7) -- Zeit zum Ablegen in der eigenen Base
+                      task.wait(0.8)
                   end
                   task.wait(0.1)
               end
@@ -97,7 +114,7 @@ FarmTab:CreateToggle({
    end,
 })
 
--- Rarity Toggles
+-- Raritäten-Liste
 local list = {"GODLY", "CELESTIAL", "DIVINE", "ADMIN", "EXCLUSIVE", "ETERNAL", "OG"}
 for _, r in ipairs(list) do
     FarmTab:CreateToggle({
