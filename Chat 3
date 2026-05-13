@@ -1,117 +1,105 @@
 --[[
-    YOGIMINI VERSION 2.5
-    FINAL PROTECTION: FOLDER-LEVEL BLACKLIST
+    YOGIMINI V1.0 | AUTO-FUSE SYSTEM
+    Fokus: 3x Godly -> Wait -> Claim -> Repeat
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V2.5 | Anti-Base",
-   LoadingTitle = "Securing Perimeter...",
+   Name = "Yogimini V1.0 | Fuse Master",
+   LoadingTitle = "Initializing Fuse Logic...",
    LoadingSubtitle = "by Gemini",
-   ConfigurationSaving = {Enabled = false},
-   KeySystem = false
+   ConfigurationSaving = {Enabled = false}
 })
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
-local farming = false
-local basePos = nil
+local player = game:GetService("Players").LocalPlayer
+local fusing = false
 
-local selectedRarities = {
-    ["ADMIN"] = false, ["ETERNAL"] = false, ["OG"] = false, 
-    ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
-}
+-- // FUNKTIONEN //
 
--- // TARGET LOGIK MIT ORDNER-SPERRE //
-local function getTarget()
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("TextLabel") then
-            local text = obj.Text:upper()
-            for rarity, enabled in pairs(selectedRarities) do
-                if enabled and string.find(text, rarity) then
-                    
-                    local model = obj:FindFirstAncestorOfClass("Model")
-                    if model and not Players:GetPlayerFromCharacter(model) then
-                        
-                        -- 1. ORDNER-CHECK (Der ultimative Base-Killer)
-                        local fullName = model:GetFullName():lower()
-                        -- Wenn das Ziel in einem "Plot", "Base", "House" oder "Player" Ordner liegt -> BLOCK
-                        if fullName:find("plot") or fullName:find("base") or fullName:find("house") or fullName:find("player") then
-                            continue 
-                        end
-
-                        local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                        if hrp then
-                            -- 2. GRÖSSEN-CHECK (Knöpfe am Boden ignorieren)
-                            if hrp.Size.Y < 1.3 then continue end
-                            
-                            -- 3. TEXT-CHECK (Keine Shop-Schilder)
-                            if text:lower():find("spawn") or text:lower():find("only") then continue end
-
-                            return model, hrp
-                        end
-                    end
-                end
+-- Findet Godlys in deinem Inventar (muss an das Spiel-Backend angepasst sein)
+local function getGodlys()
+    local godlys = {}
+    -- Hier suchen wir in deinem Inventar-Ordner (meistens in ReplicatedStorage oder PlayerGui)
+    -- Da ich die genaue Inventar-Struktur nicht sehe, nutzen wir einen Platzhalter-Check
+    local inventory = player:FindFirstChild("Inventory") or player:FindFirstChild("Data")
+    
+    if inventory then
+        for _, item in ipairs(inventory:GetDescendants()) do
+            if item.Name:lower():find("godly") or (item:IsA("StringValue") and item.Value == "Godly") then
+                table.insert(godlys, item)
+                if #godlys >= 3 then break end
             end
         end
     end
-    return nil
+    return godlys
+end
+
+local function startFuse()
+    local godlys = getGodlys()
+    
+    if #godlys < 3 then
+        Rayfield:Notify({Title = "Fehler", Content = "Nicht genug Godlys!", Duration = 5})
+        return false
+    end
+
+    -- 1. Maschine öffnen / Remote feuern
+    local fuseRemote = ReplicatedStorage:FindFirstChild("Fuse", true) or ReplicatedStorage:FindFirstChild("Craft", true)
+    
+    if fuseRemote then
+        -- Wir schicken die IDs der 3 Godlys an den Server
+        -- Das Format variiert je nach Spiel, meistens eine Table:
+        fuseRemote:FireServer("StartFuse", {godlys[1], godlys[2], godlys[3]})
+        return true
+    end
+    return false
+end
+
+local function claimFuse()
+    local claimRemote = ReplicatedStorage:FindFirstChild("ClaimFuse", true) or ReplicatedStorage:FindFirstChild("Collect", true)
+    if claimRemote then
+        claimRemote:FireServer()
+        return true
+    end
+    return false
 end
 
 -- // UI //
-local FarmTab = Window:CreateTab("Automation", 4483362458)
+local MainTab = Window:CreateTab("Fuse Farm", 4483362458)
 
-FarmTab:CreateToggle({
-   Name = "START AUTO-FARM",
+MainTab:CreateToggle({
+   Name = "AUTO-FUSE GODLYS",
    CurrentValue = false,
-   Flag = "MasterToggle",
    Callback = function(Value)
-      farming = Value
-      if farming then
-          if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-              basePos = player.Character.HumanoidRootPart.CFrame
-          end
-          
-          task.spawn(function()
-              while farming do
-                  local target, hrp = getTarget()
-                  if hrp and farming then
-                      -- TP ZUM NPC
-                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -2.5)
-                      task.wait(0.35)
-                      
-                      -- INTERAKTION (E hämmern)
-                      local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                      local endTime = tick() + 0.8
-                      while tick() < endTime and farming do
-                          if prompt then fireproximityprompt(prompt) end
-                          game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                          task.wait(0.1)
-                          game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                      end
-                      
-                      -- SOFORTIGER RÜCKFLUG
-                      task.wait(0.1)
-                      if basePos then
-                          player.Character.HumanoidRootPart.CFrame = basePos
-                      end
-                      task.wait(0.8)
+      fusing = Value
+      
+      task.spawn(function()
+          while fusing do
+              Rayfield:Notify({Title = "Status", Content = "Versuche Fuse zu starten...", Duration = 2})
+              
+              local success = startFuse()
+              
+              if success then
+                  Rayfield:Notify({Title = "Timer", Content = "Warte 20 Minuten...", Duration = 5})
+                  -- Warten: 20 Minuten = 1200 Sekunden
+                  -- Wir checken alle 10 Sekunden ob "fusing" noch an ist
+                  for i = 1, 120 do
+                      if not fusing then break end
+                      task.wait(10)
                   end
-                  task.wait(0.1)
+                  
+                  if fusing then
+                      claimFuse()
+                      Rayfield:Notify({Title = "Erfolg", Content = "Item abgeholt! Neustart...", Duration = 3})
+                  end
+              else
+                  task.wait(30) -- Warten falls keine Godlys da sind
               end
-          end)
-      end
+          end
+      end)
    end,
 })
 
--- Toggles
-local list = {"GODLY", "CELESTIAL", "DIVINE", "ADMIN", "EXCLUSIVE", "ETERNAL", "OG"}
-for _, r in ipairs(list) do
-    FarmTab:CreateToggle({
-       Name = "Collect " .. r,
-       CurrentValue = false,
-       Callback = function(Value) selectedRarities[r] = Value end,
-    })
-end
+MainTab:CreateSection("Info")
+MainTab:CreateLabel("Script wartet 20 Min nach dem Fuser-Start.")
