@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 2.2
-    Challenge 3: E-Press & Instant Base Return
+    YOGIMINI VERSION 2.3
+    STRICT REPAIR: FIXED E-INTERACTION & RETURN
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V2.2 | Final Challenge",
-   LoadingTitle = "Executing Farm...",
+   Name = "Yogimini V2.3 | Final Step",
+   LoadingTitle = "Fixing Interaction...",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
@@ -24,18 +24,20 @@ local selectedRarities = {
     ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
 }
 
--- // TARGET LOGIK (Knopf-Sicher) //
+-- DER KERN DER FUNKTIONIERT (Target-Suche)
 local function getTarget()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
             local text = obj.Text:upper()
             for rarity, enabled in pairs(selectedRarities) do
                 if enabled and string.find(text, rarity) then
+                    -- Filter gegen Shop/Schilder
                     if string.find(text:lower(), "spawn") or string.find(text:lower(), "only") then continue end
                     
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model and not Players:GetPlayerFromCharacter(model) then
                         local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                        -- Radius & Größen-Check gegen Knöpfe
                         if hrp and hrp.Size.Y > 1.3 and (hrp.Position * Vector3.new(1,0,1)).Magnitude < 250 then
                             return model, hrp
                         end
@@ -57,7 +59,7 @@ FarmTab:CreateToggle({
    Callback = function(Value)
       farming = Value
       if farming then
-          -- Position speichern, wo du den Knopf drückst
+          -- Position merken beim Start
           if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
               basePos = player.Character.HumanoidRootPart.CFrame
           end
@@ -68,30 +70,28 @@ FarmTab:CreateToggle({
                   if hrp and farming then
                       -- 1. TP ZUM NPC
                       player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -2.5)
-                      task.wait(0.2)
+                      task.wait(0.35) -- Warten damit der Server dich dort registriert
                       
-                      -- 2. "E" DRÜCKEN (INTERAKTION)
-                      -- Wir feuern alles gleichzeitig ab für 100% Erfolg
+                      -- 2. INTERAKTION (E hämmern)
                       local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                      if prompt then
-                          fireproximityprompt(prompt)
+                      
+                      -- Wir hämmern 1 Sekunde lang E und das Signal
+                      local endTime = tick() + 1.0
+                      while tick() < endTime and farming do
+                          if prompt then fireproximityprompt(prompt) end
+                          game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                          task.wait(0.1)
+                          game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                          task.wait(0.1)
                       end
                       
-                      -- E-Taste hämmern
-                      game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                      task.wait(0.1)
-                      game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                      
-                      -- Kurze Verzögerung damit das Item "ankommt"
-                      task.wait(0.4)
-                      
-                      -- 3. SOFORTIGER RÜCKFLUG ZUR BASE
+                      -- 3. ZWANGS-RÜCKFLUG ZUR BASE
+                      task.wait(0.2)
                       if basePos then
                           player.Character.HumanoidRootPart.CFrame = basePos
                       end
                       
-                      -- Pause in der Base bevor er das nächste Ziel sucht
-                      task.wait(0.8)
+                      task.wait(1.0) -- Pause in der Base zum Sellen
                   end
                   task.wait(0.1)
               end
@@ -100,7 +100,7 @@ FarmTab:CreateToggle({
    end,
 })
 
--- Toggles für die Liste
+-- Toggles
 local list = {"GODLY", "CELESTIAL", "DIVINE", "ADMIN", "EXCLUSIVE", "ETERNAL", "OG"}
 for _, r in ipairs(list) do
     FarmTab:CreateToggle({
