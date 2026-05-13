@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 1.4
-    Challenge 3: NO-BUTTONS EDITION (Hard-Filter)
+    YOGIMINI VERSION 1.5
+    Challenge 3 Final Fix: Godly-Pickup & Strict Base-Block
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V1.4 | Anti-Button",
-   LoadingTitle = "Filtering Buttons...",
+   Name = "Yogimini V1.5 | Final Fix",
+   LoadingTitle = "Safe-Farm System",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {Enabled = false},
    KeySystem = false
@@ -20,16 +20,11 @@ local farming = false
 local basePos = nil
 
 local selectedRarities = {
-    ["ADMIN"] = false,
-    ["ETERNAL"] = false,
-    ["OG"] = false,
-    ["DIVINE"] = false,
-    ["CELESTIAL"] = false,
-    ["EXCLUSIVE"] = false,
-    ["GODLY"] = false
+    ["ADMIN"] = false, ["ETERNAL"] = false, ["OG"] = false, 
+    ["DIVINE"] = false, ["CELESTIAL"] = false, ["EXCLUSIVE"] = false, ["GODLY"] = false
 }
 
--- // DIE LOGIK DIE KNÖPFE HASST //
+-- // VERBESSERTER TARGET-SCANNER //
 local function getTarget()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("TextLabel") then
@@ -38,31 +33,33 @@ local function getTarget()
             for rarity, enabled in pairs(selectedRarities) do
                 if enabled and string.find(labelText, rarity) then
                     
-                    -- 1. SCHILDER/SHOP FILTER
+                    -- Filter gegen Shop/Only-Schilder
                     local lowText = obj.Text:lower()
-                    if string.find(lowText, "spawn") or string.find(lowText, "only") or string.find(lowText, "in ") then continue end
+                    if string.find(lowText, "spawn") or string.find(lowText, "only") then continue end
                     
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model then
                         local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
                         
                         if hrp then
-                            -- 2. ANTI-KNOPF-CHECK (Sehr wichtig!)
-                            -- Die Knöpfe auf deinen Bildern sind meistens flache Teile (Y-Achse sehr klein)
-                            -- Echte Brainrot-NPCs sind viel dicker/höher.
-                            if hrp.Size.Y < 1.2 then continue end -- Ignoriert flache Platten
+                            -- 1. HARD RADIUS (300 Studs) - Alles andere ist Safe Base-Bereich
+                            local dist = (hrp.Position * Vector3.new(1,0,1)).Magnitude
+                            if dist > 300 then continue end 
                             
-                            -- 3. ANTI-BASE CHECK (Radius)
-                            local mag = (hrp.Position * Vector3.new(1,0,1)).Magnitude
-                            if mag > 450 then continue end 
-                            
-                            -- 4. KEINE SPIELER
+                            -- 2. ANTI-BUTTON & ANTI-SHOP
+                            if hrp.Size.Y < 1.3 then continue end
                             if Players:GetPlayerFromCharacter(model) then continue end
                             
-                            -- 5. BUTTON-NAMEN FILTER
-                            if string.find(model.Name:lower(), "button") or string.find(model.Name:lower(), "pad") then continue end
+                            -- 3. BASE-ELEMENT CHECK
+                            local isBase = false
+                            for _, part in ipairs(model:GetChildren()) do
+                                if part.Name:lower():find("wall") or part.Name:lower():find("floor") then
+                                    isBase = true break
+                                end
+                            end
+                            if isBase then continue end
 
-                            return model, hrp
+                            return model, hrp, rarity
                         end
                     end
                 end
@@ -87,36 +84,40 @@ FarmTab:CreateToggle({
           end
           task.spawn(function()
               while farming do
-                  local target, hrp = getTarget()
+                  local target, hrp, rarityType = getTarget()
                   if hrp and farming then
-                      -- Teleport 4 Studs drüber
-                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 4, 0)
-                      task.wait(0.3)
+                      -- 1. TP ZUM ZIEL (Etwas versetzt für Godly)
+                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
+                      task.wait(0.4) -- Zeit zum Laden
                       
-                      -- Remote-Signal
+                      -- 2. COLLECT LOGIK (Mehrfaches Signal für Godly)
                       local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
-                      if remote and remote:IsA("RemoteEvent") then remote:FireServer(target) end
                       
-                      -- E-Taste
-                      game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                      task.wait(0.1)
-                      game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                      for i = 1, 3 do -- Wir feuern 3x für maximale Sicherheit
+                          if remote then remote:FireServer(target) end
+                          game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                          task.wait(0.05)
+                          game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                      end
                       
                       task.wait(0.2)
+                      -- 3. ESCAPE
                       player.Character.HumanoidRootPart.CFrame = basePos
                   end
-                  task.wait(1.2)
+                  task.wait(1.5) -- Stabilere Pause
               end
           end)
       end
    end,
 })
 
-local rarityList = {"ADMIN", "ETERNAL", "OG", "DIVINE", "CELESTIAL", "EXCLUSIVE", "GODLY"}
-for _, rarity in ipairs(rarityList) do
+-- Rarity Toggles
+for rarity, _ in pairs(selectedRarities) do
     FarmTab:CreateToggle({
        Name = "Collect " .. rarity,
        CurrentValue = false,
        Callback = function(Value) selectedRarities[rarity] = Value end,
     })
 end
+
+Rayfield:Notify({Title = "V1.5 Aktiv", Content = "Strict Base-Block & Godly-Fix geladen.", Duration = 5})
