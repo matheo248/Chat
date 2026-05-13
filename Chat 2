@@ -1,13 +1,13 @@
 --[[
-    YOGIMINI VERSION 1.1
-    Challenge 3: Seltenheits-Filter & Anti-Base-Hardlock
+    YOGIMINI VERSION 1.2
+    Challenge 3 Fix: Removed Secret & Fixed TP-Engine
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Yogimini V1.1 | Challenge 3",
-   LoadingTitle = "Advanced Rarity System",
+   Name = "Yogimini V1.2 | Challenge 3",
+   LoadingTitle = "Fixed TP & Rarity System",
    LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {
       Enabled = true,
@@ -24,7 +24,7 @@ local player = Players.LocalPlayer
 local farming = false
 local basePos = nil
 
--- Filter-Einstellungen (Standard alles aus)
+-- Filter-Einstellungen (Secret wurde entfernt)
 local selectedRarities = {
     ["ADMIN"] = false,
     ["ETERNAL"] = false,
@@ -32,37 +32,34 @@ local selectedRarities = {
     ["DIVINE"] = false,
     ["CELESTIAL"] = false,
     ["EXCLUSIVE"] = false,
-    ["GODLY"] = false,
-    ["SECRET"] = false
+    ["GODLY"] = false
 }
 
--- // LOGIK-FUNKTIONEN //
-
+-- // VERBESSERTE TARGET-LOGIK //
 local function getTarget()
-    for rarity, enabled in pairs(selectedRarities) do
-        if not enabled then continue end
+    -- Wir scannen direkt den Workspace für maximale Performance
+    for _, model in ipairs(workspace:GetChildren()) do
+        -- Wir suchen in jedem Model nach einem TextLabel (Rarity-Tag)
+        local label = model:FindFirstChildWhichIsA("TextLabel", true)
         
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("TextLabel") and string.find(obj.Text:upper(), rarity) then
-                -- Filter gegen Schilder (Bild 1000053036.jpg)
-                if string.find(obj.Text:lower(), "spawn") or string.find(obj.Text:lower(), "in ") then continue end
-                
-                local model = obj:FindFirstAncestorOfClass("Model")
-                if model then
+        if label then
+            local labelText = label.Text:upper()
+            
+            -- Prüfen ob die gefundene Seltenheit aktiviert ist
+            for rarity, enabled in pairs(selectedRarities) do
+                if enabled and string.find(labelText, rarity) then
+                    
+                    -- Filter gegen Schilder & Spawn-Nachrichten
+                    if string.find(labelText:lower(), "spawn") or string.find(labelText:lower(), "in ") then continue end
+                    
                     local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
                     if hrp then
-                        -- 1. HARD-RADIUS FIX: Nur in der Mitte der Map (Radius 350 Studs)
-                        -- Basen liegen meist bei 500+ Studs Entfernung
-                        local distanceFromCenter = (hrp.Position * Vector3.new(1,0,1)).Magnitude
-                        if distanceFromCenter > 350 then continue end
-
-                        -- 2. PLAYER CHECK
+                        -- BASE-CHECK: Wir prüfen Distanz und Namen
+                        local dist = (hrp.Position * Vector3.new(1,0,1)).Magnitude
+                        if dist > 400 then continue end -- Alles über 400m ist meistens Base-Bereich
+                        
                         if Players:GetPlayerFromCharacter(model) then continue end
                         
-                        -- 3. BASE-NAME CHECK (Zusatzsicherung)
-                        local fullName = model:GetFullName():lower()
-                        if string.find(fullName, "base") or string.find(fullName, "plot") then continue end
-
                         return model, hrp
                     end
                 end
@@ -73,7 +70,6 @@ local function getTarget()
 end
 
 -- // UI TABS //
-
 local FarmTab = Window:CreateTab("Farm Settings", 4483362458)
 
 FarmTab:CreateSection("Master Control")
@@ -84,27 +80,37 @@ FarmTab:CreateToggle({
    Callback = function(Value)
       farming = Value
       if farming then
-          basePos = player.Character.HumanoidRootPart.CFrame
+          -- Sicheren Standpunkt beim Aktivieren speichern
+          if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+              basePos = player.Character.HumanoidRootPart.CFrame
+              Rayfield:Notify({Title = "System Aktiv", Content = "Suche nach aktivierten Raritäten...", Duration = 2})
+          end
+
           task.spawn(function()
               while farming do
                   local target, hrp = getTarget()
+                  
                   if hrp and farming then
-                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 5, 0)
+                      -- TELEPORT ENGINE (Verbessert)
+                      player.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 4, 0)
                       task.wait(0.3)
                       
+                      -- COLLECT LOGIK
                       local remote = ReplicatedStorage:FindFirstChild("Steal", true) or ReplicatedStorage:FindFirstChild("Collect", true)
                       if remote and remote:IsA("RemoteEvent") then
                           remote:FireServer(target)
                       end
                       
+                      -- Kurzer E-Druck (Fallback)
                       game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
                       task.wait(0.1)
                       game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
                       
                       task.wait(0.2)
+                      -- ESCAPE ZURÜCK ZUR BASE
                       player.Character.HumanoidRootPart.CFrame = basePos
                   end
-                  task.wait(1.2)
+                  task.wait(1) -- Zeit zwischen den Scans
               end
           end)
       end
@@ -113,8 +119,9 @@ FarmTab:CreateToggle({
 
 FarmTab:CreateSection("Rarity Selection")
 
--- Erstelle Toggles für jede Seltenheit
-for rarity, _ in pairs(selectedRarities) do
+-- Toggles für die gewünschten Raritäten (Alphabetisch sortiert)
+local rarityList = {"ADMIN", "ETERNAL", "OG", "DIVINE", "CELESTIAL", "EXCLUSIVE", "GODLY"}
+for _, rarity in ipairs(rarityList) do
     FarmTab:CreateToggle({
        Name = "Collect " .. rarity,
        CurrentValue = false,
@@ -131,7 +138,7 @@ MiscTab:CreateButton({
 })
 
 Rayfield:Notify({
-   Title = "Yogimini V1.1",
-   Content = "Wähle deine Seltenheiten aus und starte den Farm!",
+   Title = "V1.2 Geladen",
+   Content = "Secret entfernt, TP gefixt.",
    Duration = 5
 })
